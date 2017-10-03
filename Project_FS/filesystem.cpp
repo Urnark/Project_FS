@@ -21,13 +21,15 @@ FileSystem::Folder* FileSystem::removeFolder(std::string fileName) {
 	Folder* result;
 	if (this->currentFolder->children.size() != 0) {
 		int location = -1;
+		Folder* child = nullptr;
 		for (int i = 0; i < this->currentFolder->children.size(); i++) {
-			if (fileName == this->currentFolder->children[i]->name) {
+			child = dynamic_cast<Folder*>(this->currentFolder->children[i]);
+			if (fileName == child->name) {
 				location = i;
 			}
 
-			if (this->currentFolder->children[i]->children.size() == 0) {
-				result = this->currentFolder->children[i];
+			if (child->children.size() == 0) {
+				result = child;
 				this->currentFolder->children.erase[i];
 			}
 			else {
@@ -45,7 +47,7 @@ FileSystem::File* FileSystem::removeFile(std::string name) {
 
 int FileSystem::changeFolder(std::string path) {
 	if (path == "..") {
-		this->currentFolder = this->currentFolder->parent;
+		this->currentFolder = dynamic_cast<Folder*>(this->currentFolder->parent);
 	}
 	else if (path == ".") {
 

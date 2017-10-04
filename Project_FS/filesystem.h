@@ -20,7 +20,7 @@ private:
 		Node* parent = nullptr;
 		std::string name;
 		int size;
-		Node(std::string name = "?") { this->name = name; this->parent = nullptr; };
+		Node(std::string name = "?") { this->name = name;};
 		virtual ~Node() {};
 	};
 	
@@ -31,28 +31,37 @@ private:
 		Folder(std::string name, Folder* parent) : Node(name) { this->parent = parent; };
 		~Folder() {};
 		void addFolder(std::string name, Folder* theFolder) { children.push_back(new Folder(name, theFolder)); };
-		void addFile(std::string name, char startBlock) { children.push_back(new File(name, startBlock, this)); }; //Försöker lägga en File i en Folder-array // tror detta är fixat
+		void addFile(std::string name, char startBlock, std::string data) { children.push_back(new File(name, startBlock, data, this)); }; //Försöker lägga en File i en Folder-array // tror detta är fixat
 	};
 
 	class File : public Node
 	{
 	public:
 		char startBlock;
-		File(std::string name, char startBlock, Folder* parent = nullptr) : Node(name) { this->startBlock = startBlock; this->parent = parent; };
+		std::string data;
+		File(std::string name, char startBlock, std::string data, Folder* parent = nullptr) : Node(name)
+		{ 
+			this->startBlock = startBlock; 
+			this->data = data; 
+			this->parent = parent; 
+		};
 		~File() {};
 	};
 
 	Folder* root;
 	Folder* currentFolder;
+	char freeBlock;
 public:
 	FileSystem();
 	~FileSystem();
 
 	/* Egna funktioner */
-	void addFolder(std::string name);
-	void addFile(std::string name, char startBlock);
-	Folder* removeFolder(std::string name);
-	File* removeFile(std::string name);
+	void addFolder(std::string name); // using currentFolder
+	void addFile(std::string name, std::string data); // using currentFolder
+	Folder* unmountFolder(std::string name); // using currentFolder
+	void deleteFolder(Folder* folder); // using currentFolder
+	File* removeFile(std::string name); // using currentFolder
+	void deleteFile(File* file); // using currentFolder
 	int changeFolder(std::string path);
 	// 0 = failed. 1 = success
 

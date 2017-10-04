@@ -9,7 +9,7 @@ FileSystem::FileSystem()
 
 FileSystem::~FileSystem()
 {
-	delete this->root;
+	deleteFolder(this->root);
 }
 
 void FileSystem::addFolder(std::string name)
@@ -62,6 +62,23 @@ void FileSystem::deleteFolder(Folder * folder)
 			delete folder->children[i];
 			folder->children.erase(folder->children.begin() + i); // Vet inte om denna avallokerar minne
 		}
+	}
+	if (folder != this->root)
+	{
+		// Search for the position of the folder in is parent list of children
+		Folder* child = nullptr;
+		int location = -1;
+		for (int i = 0; i < this->currentFolder->children.size() && location == -1; i++) {
+			child = dynamic_cast<Folder*>(this->currentFolder->children[i]);
+			if (child == folder) {
+				location = i;
+			}
+		}
+		// Delete the folder
+		this->currentFolder = dynamic_cast<Folder*>(this->currentFolder->parent);
+		delete this->currentFolder->children[location];
+		this->currentFolder->children.erase(this->currentFolder->children.begin() + location); // Vet inte om denna avallokerar minne
+
 	}
 }
 

@@ -5,6 +5,9 @@ FileSystem::FileSystem()
 	this->root = new Folder("root", this->root);
 	this->currentFolder = this->root;
 	this->freeBlock = 0;
+
+	for (int i = 0; i < 250; i++)
+		blocksEmpty[i] = false;
 }
 
 FileSystem::~FileSystem()
@@ -19,7 +22,42 @@ void FileSystem::addFolder(std::string name)
 
 void FileSystem::addFile(std::string name, std::string data)
 {
-	this->currentFolder->addFile(name, this->freeBlock++, data);
+	int nrOfNeededBlocks = 1;
+	this->freeBlock = -1;
+
+	// Find a empty block in the table
+	for (int i = 1; i < mMemblockDevice.size() && this->freeBlock == -1; i++)
+	{
+		if (!blocksEmpty[i])
+			this->freeBlock = i;
+	}
+	// Create a file in the FS
+	File* newFile = dynamic_cast<File*>(this->currentFolder->addFile(name, this->freeBlock));
+	// Find how many block that the data in the file need
+	std::string tempData = data;
+	while (tempData.size() > mMemblockDevice[0].size())
+	{
+		nrOfNeededBlocks++;
+		tempData = tempData.substr(0, (tempData.size() > mMemblockDevice[0].size()? tempData.size() - mMemblockDevice[0].size(): tempData.size())); // tror att det är så substr fungerar
+	}
+	// Set the data table for the file and write the data to memory
+	int freeBlockStart = this->freeBlock;
+	for (int i = 1; i < mMemblockDevice.size() && nrOfNeededBlocks != 0; i++)
+	{
+		i = (freeBlockStart + i) % mMemblockDevice.size();
+		if (!blocksEmpty[i])
+		{
+			blocksEmpty[i] = true;
+			nrOfNeededBlocks++;
+			// Write the data to the right block
+			mMemblockDevice[i].writeBlock(data.substr(0, (data.size() > mMemblockDevice[0].size() ? mMemblockDevice[0].size() : data.size())));
+		}
+	}
+	// Write the data to the table block(first block in the array)
+	std::string table = "";
+	for (int i = 0; i < mMemblockDevice.size(); i++)
+		table += blocksEmpty[i];
+	mMemblockDevice[0].writeBlock(table);
 }
 
 /*Remove a folder from the FS and return it(unmount)*/

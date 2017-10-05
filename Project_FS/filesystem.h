@@ -10,6 +10,7 @@ class FileSystem
 {
 private:
 	MemBlockDevice mMemblockDevice;
+	bool blocksEmpty[250];
 
 	// Data structure
 	std::string rootName = "/";
@@ -31,23 +32,24 @@ private:
 		Folder(std::string name, Folder* parent) : Node(name) { this->parent = parent; };
 		~Folder() {};
 		void addFolder(std::string name, Folder* theFolder) { children.push_back(new Folder(name, theFolder)); };
-		void addFile(std::string name, char startBlock, std::string data) { children.push_back(new File(name, startBlock, data, this)); }; //Försöker lägga en File i en Folder-array // tror detta är fixat
+		Node* addFile(std::string name, char startBlock)
+		{
+			children.push_back(new File(name, startBlock, this)); 
+			return children.back();
+		};
 	};
 
 	class File : public Node
 	{
 	public:
 		char startBlock;
-		std::string data;
-		File(std::string name, char startBlock, std::string data, Folder* parent = nullptr) : Node(name)
+		File(std::string name, char startBlock, Folder* parent = nullptr) : Node(name)
 		{ 
 			this->startBlock = startBlock; 
-			this->data = data; 
-			this->parent = parent; 
+			this->parent = parent;
 		};
 		~File() {};
 	};
-
 	Folder* root;
 	Folder* currentFolder;
 	char freeBlock;

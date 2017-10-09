@@ -4,10 +4,9 @@ FileSystem::FileSystem()
 {
 	this->root = new Folder("root", this->root);
 	this->currentFolder = this->root;
-	this->freeBlock = 0;
 
-	for (int i = 0; i < 250; i++)
-		blocksEmpty[i] = false;
+	for (int i = 0; i < this->mMemblockDevice.size(); i++)
+		this->emptyBlocks.push_back(i);
 }
 
 FileSystem::~FileSystem()
@@ -15,49 +14,74 @@ FileSystem::~FileSystem()
 	deleteFolder(this->root);
 }
 
-void FileSystem::addFolder(std::string name)
+void FileSystem::createFolder(const std::string &dirpath)
 {
+	Folder* folder = this->currentFolder;
+	std::string name = this->goToFolder(dirpath);
 	this->currentFolder->addFolder(name, this->currentFolder);
+	this->currentFolder = folder;
+}
+
+void FileSystem::removeFile(std::string filepath)
+{
+	Folder* folder = this->currentFolder;
+	int i = filepath.size() - 1;
+	bool done = false;
+	while (!done && i != -1)
+	{
+		if (filepath.at(i) == '/')
+		{
+			done = true;
+			i++;
+		}
+		i--;
+	}
+
+	filepath = filepath.substr(0, i);
+	std::string name = filepath.substr(i, filepath.size() - i);
+	this->goToFolder(filepath);
+
+	File* file = dynamic_cast<File*>(this->currentFolder->children[findFile(name)]);
+	this->currentFolder = folder;
+
+	this->deleteFile(file);
 }
 
 void FileSystem::addFile(std::string name, std::string data)
 {
-	int nrOfNeededBlocks = 1;
-	this->freeBlock = -1;
+	File* newFile = dynamic_cast<File*>(this->currentFolder->addFile(name));
 
-	// Find a empty block in the table
-	for (int i = 1; i < mMemblockDevice.size() && this->freeBlock == -1; i++)
-	{
-		if (!blocksEmpty[i])
-			this->freeBlock = i;
-	}
-	// Create a file in the FS
-	File* newFile = dynamic_cast<File*>(this->currentFolder->addFile(name, this->freeBlock));
-	// Find how many block that the data in the file need
+	int nrOfNeededBlocks = 1;
 	std::string tempData = data;
-	while (tempData.size() > mMemblockDevice[0].size())
+	while (tempData.size() > this->mMemblockDevice[0].size())
 	{
 		nrOfNeededBlocks++;
-		tempData = tempData.substr(0, (tempData.size() > mMemblockDevice[0].size()? tempData.size() - mMemblockDevice[0].size(): tempData.size())); // tror att det är så substr fungerar
+		tempData = tempData.substr(0,
+			(tempData.size() > this->mMemblockDevice[0].size()? tempData.size() - this->mMemblockDevice[0].size(): tempData.size()));
 	}
-	// Set the data table for the file and write the data to memory
-	int freeBlockStart = this->freeBlock;
-	for (int i = 1; i < mMemblockDevice.size() && nrOfNeededBlocks != 0; i++)
+
+	for (int i = 0; i < nrOfNeededBlocks; i++)
 	{
-		i = (freeBlockStart + i) % mMemblockDevice.size();
-		if (!blocksEmpty[i])
+		if (this->emptyBlocks.size() > 0)
 		{
-			blocksEmpty[i] = true;
-			nrOfNeededBlocks++;
-			// Write the data to the right block
-			mMemblockDevice[i].writeBlock(data.substr(0, (data.size() > mMemblockDevice[0].size() ? mMemblockDevice[0].size() : data.size())));
+			newFile->blocks.push_back(this->emptyBlocks.back());
+			this->emptyBlocks.pop_back();
 		}
 	}
-	// Write the data to the table block(first block in the array)
-	std::string table = "";
-	for (int i = 0; i < mMemblockDevice.size(); i++)
-		table += blocksEmpty[i];
-	mMemblockDevice[0].writeBlock(table);
+	int index = 0;
+	std::string remainingData = data;
+	std::string inputData;
+	for(int i = 0; i < newFile->blocks.size(); i++)
+	{
+		index = newFile->blocks[i];
+		inputData = remainingData.substr(0,
+			(remainingData.size() > this->mMemblockDevice[0].size() ? this->mMemblockDevice[0].size() : remainingData.size()));
+
+		remainingData = remainingData.substr(0,
+			(remainingData.size() > this->mMemblockDevice[0].size()? remainingData.size() - this->mMemblockDevice[0].size(): remainingData.size()));
+
+		this->mMemblockDevice.writeBlock(index, inputData);
+	}
 }
 
 /*Remove a folder from the FS and return it(unmount)*/
@@ -96,22 +120,18 @@ void FileSystem::deleteFolder(Folder * folder)
 			if (child != nullptr) // is a folder
 			{
 				deleteFolder(child);
+			} else { // is a file
+				this->deleteFile(dynamic_cast<File*>(folder->children[i]), folder);
 			}
-			delete folder->children[i];
-			folder->children.erase(folder->children.begin() + i); // Vet inte om denna avallokerar minne
 		}
+		for (int i = 0; i < folder->children.size(); i++)
+			folder->children.erase(folder->children.begin() + i); // Vet inte om denna avallokerar minne
 	}
 	if (folder != this->root)
 	{
 		// Search for the position of the folder in is parent list of children
-		Folder* child = nullptr;
-		int location = -1;
-		for (int i = 0; i < this->currentFolder->children.size() && location == -1; i++) {
-			child = dynamic_cast<Folder*>(this->currentFolder->children[i]);
-			if (child == folder) {
-				location = i;
-			}
-		}
+		int location = this->findFolder(folder->name);
+
 		// Delete the folder
 		this->currentFolder = dynamic_cast<Folder*>(this->currentFolder->parent);
 		delete this->currentFolder->children[location];
@@ -121,7 +141,7 @@ void FileSystem::deleteFolder(Folder * folder)
 }
 
 /*Remove a file from the current folder and return that file*/
-FileSystem::File* FileSystem::removeFile(std::string name)
+FileSystem::File* FileSystem::detachFile(std::string name)
 {
 	File* file = nullptr;
 	// Search for right file
@@ -146,36 +166,118 @@ FileSystem::File* FileSystem::removeFile(std::string name)
 }
 
 /*Delete a file in the current folder*/
-void FileSystem::deleteFile(File * file)
+void FileSystem::deleteFile(File * file, Folder *parent)
 {
-	std::string name = file->name;
-	// Search for right file
+	if (parent == nullptr) parent = this->currentFolder;
+	int location = this->findFile(file->name);
+	parent->children.erase(parent->children.begin() + location);
+	this->freeFile(file);
+	delete file;
+}
+
+/* Change folder and return the last name in the path */
+std::string FileSystem::goToFolder(std::string path)
+{
+
+	bool err = false;
+	std::string temp = "";
+	if (path.at(0) == '/')
+	{
+		this->currentFolder = this->root;
+	}
+	while (path.size() > 1 && !err)
+	{
+		this->parsePath(temp, path);
+		if (temp == "..")
+		{
+			this->currentFolder = dynamic_cast<Folder*>(this->currentFolder->parent);
+		}
+		else if (temp != ".")
+		{
+			int location = this->findFolder(temp);
+			if (location != -1)
+			{
+				this->currentFolder = dynamic_cast<Folder*>(this->currentFolder->children[location]);
+			}
+			else
+			{
+				err = true;
+			}
+		}
+	}
+	return temp;
+}
+
+/*Create a new file in the FS*/
+void FileSystem::createFile(const std::string &filepath, const std::string &data)
+{
+	Folder* folder = this->currentFolder;
+	std::string name = this->goToFolder(filepath);
+	this->addFile(name, data);
+	this->currentFolder = folder;
+}
+
+int FileSystem::findFolder(std::string name) const
+{
 	int location = -1;
+	Folder* folder = nullptr;
+	for (int i = 0; i < this->currentFolder->children.size() && location == -1; i++) {
+		folder = dynamic_cast<Folder*>(this->currentFolder->children[i]);
+		if (name == folder->name) {
+			location = i;
+		}
+	}
+	return location;
+}
+
+int FileSystem::findFile(std::string name) const
+{
+	int location = -1;
+	File* file = nullptr;
 	for (int i = 0; i < this->currentFolder->children.size() && location == -1; i++) {
 		file = dynamic_cast<File*>(this->currentFolder->children[i]);
 		if (name == file->name) {
 			location = i;
 		}
 	}
-	this->currentFolder->children.erase(this->currentFolder->children.begin() + location); // Vet inte om denna avallokerar minne
-	delete file;
+	return location;
 }
 
-int FileSystem::changeFolder(std::string path)
+void FileSystem::parsePath(std::string &temp, std::string &path)
 {
-	int result = 1;
-	if (path == "..") {
-		this->currentFolder = dynamic_cast<Folder*>(this->currentFolder->parent);
+	int i = -1;
+	int index = 0;
+	if (path.at(0) == '/')
+	{
+		index = 1;
+		while (i == -1)
+		{
+			if (path.at(index) == '/')
+			{
+				i = index;
+			}
+			index++;
+		}
+		index = 1;
 	}
-	else if (path == ".") {
-
+	else // start with './'
+	{
+		index = 0;
+		i = 1;
 	}
-	else if (path == "") {
-
-	}
-	return result;
+	temp = path.substr(index, i);
+	path = path.substr(index + i, path.size() - i);
 }
 
+/* Free the blocks that the file uses */
+void FileSystem::freeFile(File *file)
+{
+	for (int i = 0; i < file->blocks.size(); i++)
+	{
+		this->emptyBlocks.push_back(file->blocks[i]);
+	}
+	file->blocks.clear();
+}
 
 
 /* Please insert your code */

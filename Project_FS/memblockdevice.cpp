@@ -56,7 +56,16 @@ int MemBlockDevice::writeBlock(int blockNr, const std::string &strBlock) {
     if (blockNr < this->nrOfBlocks && blockNr >= 0) {
         /* -2 = str-length and block dont have same dimensions */
         /* 1 = success */
-        output = this->memBlocks[blockNr].writeBlock(strBlock);
+		std::string strBlockTemp = strBlock;
+        if (strBlock.size() < this->memBlocks[0].size())
+        {
+          int n = this->memBlocks[0].size() - strBlock.size();
+          for (int i = 0; i < n; i++)
+          {
+			  strBlockTemp += " ";
+          }
+        }
+        output = this->memBlocks[blockNr].writeBlock(strBlockTemp);
     }
     return output;
 }

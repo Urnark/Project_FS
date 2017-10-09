@@ -27,6 +27,8 @@ int main(void) {
 
     bool bRun = true;
 
+	FileSystem fs;
+
     do {
         std::cout << user << ":" << currentDir << "$ ";
         getline(std::cin, userCommand);
@@ -46,6 +48,8 @@ int main(void) {
                 std::cout << "Listing directory" << std::endl;
                 break;
             case 3: // create
+				getline(std::cin, userCommand);
+				fs.createFile(commandArr[1], userCommand);
                 break;
             case 4: // cat
                 break;
@@ -54,6 +58,7 @@ int main(void) {
             case 6: // restoreImage
                 break;
             case 7: // rm
+				fs.removeFile(commandArr[1]);
                 break;
             case 8: // cp
                 break;
@@ -62,8 +67,10 @@ int main(void) {
             case 10: // mv
                 break;
             case 11: // mkdir
+				fs.createFolder(commandArr[1]);
                 break;
             case 12: // cd
+				fs.goToFolder(commandArr[1]);
                 break;
             case 13: // pwd
                 break;

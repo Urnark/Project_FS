@@ -40,11 +40,9 @@ void FileSystem::removeFile(std::string filepath)
 	filepath = filepath.substr(0, i);
 	std::string name = filepath.substr(i, filepath.size() - i);
 	this->goToFolder(filepath);
-
 	File* file = dynamic_cast<File*>(this->currentFolder->children[findFile(name)]);
-	this->currentFolder = folder;
-
 	this->deleteFile(file);
+	this->currentFolder = folder;
 }
 
 void FileSystem::addFile(std::string name, std::string data)

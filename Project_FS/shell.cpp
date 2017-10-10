@@ -43,15 +43,21 @@ int main(void) {
 				bRun = quit();                
                 break;
             case 1: // format
+				fs = FileSystem(); // Tror detta borde fungera bättre i denn situation
+				//fs.removeFolder("/");
                 break;
             case 2: // ls
-                std::cout << "Listing directory" << std::endl;
+                std::cout << "Listing directory" << std::endl; //Stämmer commandArr[1] ?
+				userCommand = "";
+				if (nrOfCommands > 1) userCommand = commandArr[1];
+				std::cout << fs.displayChildren(userCommand) << std::endl; //Skriver ut antalet Bytes för filer, men inte mappar. 
                 break;
             case 3: // create
 				getline(std::cin, userCommand);
 				fs.createFile(commandArr[1], userCommand);
                 break;
             case 4: // cat
+				fs.getblockString(commandArr[1]); //Stämmer commandArr[1] ?
                 break;
             case 5: // createImage
                 break;
@@ -65,14 +71,22 @@ int main(void) {
             case 9: // append
                 break;
             case 10: // mv
+				fs.move(commandArr[1], commandArr[2]); //Stämmer inparametrarna?
                 break;
             case 11: // mkdir
-				fs.createFolder(commandArr[1]);
+				if (fs.getCurrentFilePath() == "/")
+					userCommand = "/"+commandArr[1];
+				else
+					userCommand = fs.getCurrentFilePath() + "/" + commandArr[1];
+				std::cout << userCommand << std::endl;
+				fs.createFolder(userCommand);
                 break;
             case 12: // cd
 				fs.goToFolder(commandArr[1]);
+				currentDir = fs.getCurrentFilePath();
                 break;
             case 13: // pwd
+				fs.getCurrentFilePath(); 
                 break;
             case 14: // help
                 std::cout << help() << std::endl;

@@ -12,7 +12,6 @@ private:
 	MemBlockDevice mMemblockDevice;
 	std::vector<int> emptyBlocks;
 	// Data structure
-	std::string rootName = "/";
 
 	class Node
 	{
@@ -51,18 +50,22 @@ private:
 	void addFile(std::string name, std::string data);
 	void deleteFolder(Folder* folder);
 	void deleteFile(File* file, Folder *parent = nullptr);
+    File* detachFile(std::string name);
 
 	int findFolder(std::string name) const;
 	int findFile(std::string name) const;
 	void parsePath(std::string &temp, std::string &path);
 	void freeFile(File *file);
+	/* return the position of the last name in the path, need to know ifthe last is a file or folder
+	   Ex: if path = "/aa/b/testfile" return 6*/
+	int posOfLastNameInPath(std::string path, int type); // 0 = filepath, 1 = folderpath
 public:
 	FileSystem();
 	~FileSystem();
 
 	/* Egna funktioner */
 	Folder* unmountFolder(std::string name); // using currentFolder
-	File* detachFile(std::string name); // using currentFolder
+	 // using currentFolder
 	
 	// 0 = failed. 1 = success
 
@@ -80,13 +83,26 @@ public:
 	void removeFile(std::string filepath);// removeFile(...);
 
 	/* Removes a folder in the filesystem */
-	// removeFolder(...);
+	void removeFolder(std::string path);
 
 	/* Function will move the current location to a specified location in the filesystem*/
-	std::string goToFolder(std::string path);// goToFolder(...);
+	std::string goToFolder(std::string path);// return the last name in the path
 
 	/* This function will get all the files and folders in the specified folder */
 	// listDir(...);
+
+	/* Returns a string containing all children of currentFolder */
+	std::string displayChildren(std::string path = "./");
+
+	/* Returns the string a file has written to its memory block */
+	std::string getblockString(std::string path);
+
+	/* Returns a string representing the filepath to currentFolder*/
+	std::string getCurrentFilePath();
+
+	/* Renames a file and moves it from source to dest */
+	int move(std::string source, std::string dest);
+	// 0 = failed , 1 = success
 
 	/* Add your own member-functions if needed */
 };

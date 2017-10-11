@@ -17,6 +17,17 @@ bool quit();
 std::string help();
 
 /* More functions ... */
+void errSyntax(std::string cmdArr[]);
+void errFS(std::string cmdArr[]);
+void format(FileSystem* &fs);
+void ls(FileSystem* &fs, std::string cmdArr[], int nrOfCommands);
+void create(FileSystem* &fs, std::string cmdArr[]);
+void cat(FileSystem* &fs, std::string cmdArr[]);
+void rm(FileSystem* &fs, std::string cmdArr[]);
+void mv(FileSystem* &fs, std::string cmdArr[]);
+void mkdir(FileSystem* &fs, std::string cmdArr[]);
+void cd(FileSystem* &fs, std::string cmdArr[], std::string &currentDir);
+void pwd(FileSystem* &fs, std::string cmdArr[]);
 
 int main(void) {
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
@@ -27,7 +38,7 @@ int main(void) {
 
     bool bRun = true;
 
-	FileSystem fs;
+	FileSystem* fs = nullptr;
 
     do {
         std::cout << user << ":" << currentDir << "$ ";
@@ -43,50 +54,39 @@ int main(void) {
 				bRun = quit();                
                 break;
             case 1: // format
-				fs = FileSystem(); // Tror detta borde fungera bättre i denn situation
-				//fs.removeFolder("/");
+				format(fs);
                 break;
             case 2: // ls
-                std::cout << "Listing directory" << std::endl; //Stämmer commandArr[1] ?
-				userCommand = "";
-				if (nrOfCommands > 1) userCommand = commandArr[1];
-				std::cout << fs.displayChildren(userCommand) << std::endl; //Skriver ut antalet Bytes för filer, men inte mappar. 
+				ls(fs, commandArr, nrOfCommands);
                 break;
             case 3: // create
-				getline(std::cin, userCommand);
-				fs.createFile(commandArr[1], userCommand);
+				create(fs, commandArr);
                 break;
             case 4: // cat
-				fs.getblockString(commandArr[1]); //Stämmer commandArr[1] ?
+				cat(fs, commandArr);
                 break;
             case 5: // createImage
                 break;
             case 6: // restoreImage
                 break;
             case 7: // rm
-				fs.removeFile(commandArr[1]);
+				rm(fs, commandArr);
                 break;
             case 8: // cp
                 break;
             case 9: // append
                 break;
             case 10: // mv
-				fs.move(commandArr[1], commandArr[2]); //Stämmer inparametrarna?
+				mv(fs, commandArr);
                 break;
             case 11: // mkdir
-				if (fs.getCurrentFilePath() == "/")
-					userCommand = "/"+commandArr[1];
-				else
-					userCommand = fs.getCurrentFilePath() + "/" + commandArr[1];
-				std::cout << userCommand << std::endl;
-				fs.createFolder(userCommand);
+				mkdir(fs, commandArr);
                 break;
             case 12: // cd
-				fs.goToFolder(commandArr[1]);
-				currentDir = fs.getCurrentFilePath();
+				cd(fs, commandArr, currentDir);
                 break;
             case 13: // pwd
-				fs.getCurrentFilePath(); 
+				pwd(fs, commandArr);
                 break;
             case 14: // help
                 std::cout << help() << std::endl;
@@ -96,7 +96,7 @@ int main(void) {
             }
         }
     } while (bRun == true);
-
+	delete fs;
     return 0;
 }
 
@@ -150,3 +150,111 @@ std::string help() {
 }
 
 /* Insert code for your shell functions and call them from the switch-case */
+void errSyntax(std::string cmdArr[])
+{
+	std::cout << "Wrong syntax, use the <help> command to see the syntax for <" << cmdArr[0] << ">" << std::endl;
+}
+
+void errFS(std::string cmdArr[])
+{
+	std::cout << "Format disk first before calling commando <" << cmdArr[0] << ">" << std::endl;
+}
+
+void format(FileSystem* &fs)
+{
+	fs = new FileSystem(); // Tror detta borde fungera bättre i denn situation
+	//fs.removeFolder("/");
+}
+
+void ls(FileSystem* &fs, std::string cmdArr[], int nrOfCommands)
+{
+	if (fs == nullptr)
+	{
+		errFS(cmdArr);
+		return;
+	}
+	std::cout << "Listing directory" << std::endl;
+	std::string temp = "";
+	if (nrOfCommands > 1) temp = cmdArr[1];
+	std::cout << fs->displayChildren(temp) << std::endl;
+}
+
+void create(FileSystem* & fs, std::string cmdArr[])
+{
+	if (fs == nullptr)
+	{
+		errFS(cmdArr);
+		return;
+	}
+	std::cout << "Enter data: ";
+	std::string data = "";
+	getline(std::cin, data);
+	if (!fs->create(cmdArr[1], data))
+	{
+		errSyntax(cmdArr);
+	}
+}
+
+void cat(FileSystem* & fs, std::string cmdArr[])
+{
+	if (fs == nullptr)
+	{
+		errFS(cmdArr);
+		return;
+	}
+	std::cout << fs->getblockString(cmdArr[1]) << std::endl;
+}
+
+void rm(FileSystem* & fs, std::string cmdArr[])
+{
+	if (fs == nullptr)
+	{
+		errFS(cmdArr);
+		return;
+	}
+	fs->removeFile(cmdArr[1]);
+}
+
+void mv(FileSystem* & fs, std::string cmdArr[])
+{
+	if (fs == nullptr)
+	{
+		errFS(cmdArr);
+		return;
+	}
+	fs->move(cmdArr[1], cmdArr[2]);
+}
+
+void mkdir(FileSystem* & fs, std::string cmdArr[])
+{
+	if (fs == nullptr)
+	{
+		errFS(cmdArr);
+		return;
+	}
+	if (!fs->mkdir(cmdArr[1]))
+	{
+		errSyntax(cmdArr);
+	}
+}
+
+void cd(FileSystem* & fs, std::string cmdArr[], std::string &currentDir)
+{
+	if (fs == nullptr)
+	{
+		errFS(cmdArr);
+		return;
+	}
+	if (!fs->cd(cmdArr[1], currentDir))
+		std::cout << "The path do not exists in the filesystem" << std::endl;
+}
+
+void pwd(FileSystem* & fs, std::string cmdArr[])
+{
+	if (fs == nullptr)
+	{
+		errFS(cmdArr);
+		return;
+	}
+	std::cout << fs->getCurrentFilePath() << std::endl;
+}

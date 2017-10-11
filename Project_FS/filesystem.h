@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <string>
+#include <iostream>
 
 #include "memblockdevice.h"
 
@@ -11,6 +12,7 @@ class FileSystem
 private:
 	MemBlockDevice mMemblockDevice;
 	std::vector<int> emptyBlocks;
+	enum Type { FILE, FOLDER, NONE};
 	// Data structure
 
 	class Node
@@ -56,17 +58,22 @@ private:
 	int findFile(std::string name) const;
 	void parsePath(std::string &temp, std::string &path);
 	void freeFile(File *file);
-	/* return the position of the last name in the path, need to know ifthe last is a file or folder
+	/* return the position of the last name in the path, need to know if the last name is a file or folder
 	   Ex: if path = "/aa/b/testfile" return 6*/
-	int posOfLastNameInPath(std::string path, int type); // 0 = filepath, 1 = folderpath
+	int posOfLastNameInPath(std::string path, Type type); // 0 = filepath, 1 = folderpath
+	std::string getPathToParent(std::string path, Type type);
+	std::string getNameFromPath(std::string path, Type type);
 public:
 	FileSystem();
 	~FileSystem();
 
 	/* Egna funktioner */
 	Folder* unmountFolder(std::string name); // using currentFolder
-	 // using currentFolder
-	
+	bool pathExists(std::string path);
+
+	bool create(const std::string &filepath, const std::string &data);
+	bool mkdir(std::string name);
+	bool cd(std::string path, std::string &currentDir);
 	// 0 = failed. 1 = success
 
 	/* These API functions need to be implemented
@@ -101,8 +108,7 @@ public:
 	std::string getCurrentFilePath();
 
 	/* Renames a file and moves it from source to dest */
-	int move(std::string source, std::string dest);
-	// 0 = failed , 1 = success
+	bool move(std::string source, std::string dest);
 
 	/* Add your own member-functions if needed */
 };

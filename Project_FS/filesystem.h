@@ -70,10 +70,12 @@ public:
 	/* Egna funktioner */
 	Folder* unmountFolder(std::string name); // using currentFolder
 	bool pathExists(std::string path);
+	std::string nameToPath(const std::string &name);
 
 	bool create(const std::string &filepath, const std::string &data);
-	bool mkdir(std::string name);
 	bool cd(std::string path, std::string &currentDir);
+	bool cp(std::string oldFilepath, std::string newFilepath);
+	bool append(std::string source, std::string dest);
 	// 0 = failed. 1 = success
 
 	/* These API functions need to be implemented

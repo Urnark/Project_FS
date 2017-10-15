@@ -24,6 +24,8 @@ void ls(FileSystem* &fs, std::string cmdArr[], int nrOfCommands);
 void create(FileSystem* &fs, std::string cmdArr[]);
 void cat(FileSystem* &fs, std::string cmdArr[]);
 void rm(FileSystem* &fs, std::string cmdArr[]);
+void cp(FileSystem* &fs, std::string cmdArr[]);
+void append(FileSystem* &fs, std::string cmdArr[]);
 void mv(FileSystem* &fs, std::string cmdArr[]);
 void mkdir(FileSystem* &fs, std::string cmdArr[]);
 void cd(FileSystem* &fs, std::string cmdArr[], std::string &currentDir);
@@ -73,8 +75,10 @@ int main(void) {
 				rm(fs, commandArr);
                 break;
             case 8: // cp
+				cp(fs, commandArr);
                 break;
             case 9: // append
+				append(fs, commandArr);
                 break;
             case 10: // mv
 				mv(fs, commandArr);
@@ -162,6 +166,7 @@ void errFS(std::string cmdArr[])
 
 void format(FileSystem* &fs)
 {
+	if (fs != nullptr) delete fs;
 	fs = new FileSystem(); // Tror detta borde fungera bättre i denn situation
 	//fs.removeFolder("/");
 }
@@ -189,7 +194,7 @@ void create(FileSystem* & fs, std::string cmdArr[])
 	std::cout << "Enter data: ";
 	std::string data = "";
 	getline(std::cin, data);
-	if (!fs->create(cmdArr[1], data))
+	if (!fs->create(fs->nameToPath(cmdArr[1]), data))
 	{
 		errSyntax(cmdArr);
 	}
@@ -202,7 +207,7 @@ void cat(FileSystem* & fs, std::string cmdArr[])
 		errFS(cmdArr);
 		return;
 	}
-	std::cout << fs->getblockString(cmdArr[1]) << std::endl;
+	std::cout << fs->getblockString(fs->nameToPath(cmdArr[1])) << std::endl;
 }
 
 void rm(FileSystem* & fs, std::string cmdArr[])
@@ -212,7 +217,27 @@ void rm(FileSystem* & fs, std::string cmdArr[])
 		errFS(cmdArr);
 		return;
 	}
-	fs->removeFile(cmdArr[1]);
+	fs->removeFile(fs->nameToPath(cmdArr[1]));
+}
+
+void cp(FileSystem *& fs, std::string cmdArr[])
+{
+	if (fs == nullptr)
+	{
+		errFS(cmdArr);
+		return;
+	}
+	fs->cp(fs->nameToPath(cmdArr[1]), fs->nameToPath(cmdArr[2]));
+}
+
+void append(FileSystem *& fs, std::string cmdArr[])
+{
+	if (fs == nullptr)
+	{
+		errFS(cmdArr);
+		return;
+	}
+	fs->append(fs->nameToPath(cmdArr[1]), fs->nameToPath(cmdArr[2]));
 }
 
 void mv(FileSystem* & fs, std::string cmdArr[])
@@ -222,7 +247,7 @@ void mv(FileSystem* & fs, std::string cmdArr[])
 		errFS(cmdArr);
 		return;
 	}
-	fs->move(cmdArr[1], cmdArr[2]);
+	fs->move(fs->nameToPath(cmdArr[1]), fs->nameToPath(cmdArr[2]));
 }
 
 void mkdir(FileSystem* & fs, std::string cmdArr[])
@@ -232,10 +257,7 @@ void mkdir(FileSystem* & fs, std::string cmdArr[])
 		errFS(cmdArr);
 		return;
 	}
-	if (!fs->mkdir(cmdArr[1]))
-	{
-		errSyntax(cmdArr);
-	}
+	fs->createFolder(fs->nameToPath(cmdArr[1]));
 }
 
 void cd(FileSystem* & fs, std::string cmdArr[], std::string &currentDir)
@@ -245,7 +267,7 @@ void cd(FileSystem* & fs, std::string cmdArr[], std::string &currentDir)
 		errFS(cmdArr);
 		return;
 	}
-	if (!fs->cd(cmdArr[1], currentDir))
+	if (!fs->cd(fs->nameToPath(cmdArr[1]), currentDir))
 		std::cout << "The path do not exists in the filesystem" << std::endl;
 }
 

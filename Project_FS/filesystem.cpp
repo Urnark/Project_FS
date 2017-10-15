@@ -26,9 +26,12 @@ void FileSystem::createFolder(const std::string &dirpath)
 void FileSystem::removeFile(std::string filepath)
 {
 	Folder* folder = this->currentFolder;
-	this->goToFolder(this->getPathToParent(filepath, Type::FILE));
-	File* file = dynamic_cast<File*>(this->currentFolder->children[findFile(this->getNameFromPath(filepath, Type::FILE))]);
-	this->deleteFile(file);
+	this->goToFolder(this->getPathToParent(filepath, Type::NONE));
+	if (findFile(this->getNameFromPath(filepath, Type::FILE)) != -1)
+	{
+		File* file = dynamic_cast<File*>(this->currentFolder->children[findFile(this->getNameFromPath(filepath, Type::FILE))]);
+		this->deleteFile(file);
+	}
 	this->currentFolder = folder;
 }
 
@@ -72,7 +75,7 @@ void FileSystem::addFile(std::string name, std::string data)
 		inputData = remainingData.substr(0,
 			(remainingData.size() > this->mMemblockDevice[0].size() ? this->mMemblockDevice[0].size() : remainingData.size()));
 
-		remainingData = remainingData.substr(0,
+		remainingData = remainingData.substr((remainingData.size() > this->mMemblockDevice[0].size()  ?this->mMemblockDevice[0].size() : remainingData.size()),
 			(remainingData.size() > this->mMemblockDevice[0].size()? remainingData.size() - this->mMemblockDevice[0].size(): remainingData.size()));
 
 		this->mMemblockDevice.writeBlock(index, inputData);
@@ -151,6 +154,26 @@ bool FileSystem::pathExists(std::string path)
 	return exist;
 }
 
+std::string FileSystem::nameToPath(const std::string & name)
+{
+	bool done = false;
+	std::string path = name;
+	for (int i = 0; i < path.size() && !done; i++)
+	{
+		if (path.at(i) == '/')
+			done = true;
+	}
+	if (!done)
+	{
+		if (this->getCurrentFilePath() == "/")
+			path = "/" + name;
+		else
+			path = this->getCurrentFilePath() + "/" + name;
+
+	}
+	return path;
+}
+
 bool FileSystem::create(const std::string & filepath, const std::string & data)
 {
 	bool done = false;
@@ -158,25 +181,6 @@ bool FileSystem::create(const std::string & filepath, const std::string & data)
 	{
 		this->createFile(filepath, data);
 		done = true;
-	}
-	return done;
-}
-
-bool FileSystem::mkdir(std::string name)
-{
-	bool done = true;
-	for (int i = 0; i < name.size() && done; i++)
-	{
-		if (name.at(i) == '/')
-			done = false;
-	}
-	if (done)
-	{
-		if (this->getCurrentFilePath() == "/")
-			name = "/" + name;
-		else
-			name = this->getCurrentFilePath() + "/" + name;
-		this->createFolder(name);
 	}
 	return done;
 }
@@ -191,6 +195,48 @@ bool FileSystem::cd(std::string path, std::string &currentDir)
 		done = true;
 	}
 	return done;
+}
+
+bool FileSystem::cp(std::string oldFilepath, std::string newFilepath)
+{
+	Folder* mem = this->currentFolder; //Remember starting directory
+
+	bool result = false;
+	if (this->pathExists(oldFilepath))// Check if the source exist
+	{
+		// the old file
+		this->goToFolder(this->getPathToParent(oldFilepath, Type::NONE));
+		File* thFile = dynamic_cast<File*>(this->currentFolder->children[this->findFile(this->getNameFromPath(oldFilepath, Type::NONE))]);
+		
+		// Check if the new path to the folder of the new file exist
+		std::string pathToParentOfNewPath = this->getPathToParent(newFilepath, Type::NONE);
+		if (this->pathExists(pathToParentOfNewPath))
+		{
+			this->create(newFilepath, this->getblockString(oldFilepath));
+			result = true;
+		}
+	}
+
+	this->currentFolder = mem; //Return to starting directory
+	return result;
+}
+
+bool FileSystem::append(std::string source, std::string dest)
+{
+	Folder* mem = this->currentFolder; //Remember starting directory
+
+	bool result = false;
+	if (this->pathExists(source) && this->pathExists(dest))// Check if the paths exists
+	{
+		std::string dataDest = this->getblockString(dest);
+		this->removeFile(dest);
+		std::string newData = dataDest + this->getblockString(source);
+		this->create(dest, newData);
+		result = true;
+	}
+
+	this->currentFolder = mem; //Return to starting directory
+	return result;
 }
 
 /*Delete a folder and its children(inclusive the files in it)*/
@@ -231,19 +277,14 @@ FileSystem::File* FileSystem::detachFile(std::string name)
 {
 	File* file = nullptr;
 	// Search for right file
-	int location = -1;
-	for (int i = 0; i < this->currentFolder->children.size() && location == -1; i++) {
-		file = dynamic_cast<File*>(this->currentFolder->children[i]);
-		if (name == file->name) {
-			location = i;
-		}
-	}
+	int location = this->findFile(name);
 	if (location == -1)
 	{
 		file = nullptr;
 	}
 	else
 	{
+		file = dynamic_cast<File*>(this->currentFolder->children[location]);
 		// Remove file from its parents list of children
 		this->currentFolder->children.erase(this->currentFolder->children.begin() + location);
 	}
@@ -258,6 +299,7 @@ void FileSystem::deleteFile(File * file, Folder *parent)
 	{
 		if (parent == nullptr) parent = this->currentFolder;
 		int location = this->findFile(file->name);
+		this->currentFolder->children.erase(this->currentFolder->children.begin() + location);
 		this->freeFile(file);
 		delete file;
 	}
@@ -520,21 +562,24 @@ std::string FileSystem::getCurrentFilePath()
 bool FileSystem::move(std::string source, std::string dest) //source includes a file name, dest is a directory (and the name of the new file)
 {
 	Folder* mem = this->currentFolder; //Remember starting directory
+
 	bool result = false;
-	std::string name = this->getNameFromPath(source, Type::FILE);
-	if (this->findFile(name) != -1)// Check if the source exist
+	if (this->pathExists(source))
 	{
-		File* theFile = this->detachFile(name); //Detach the file from th FS
-		name = this->getNameFromPath(dest, Type::NONE);
-		theFile->name = name; // Rename the file
-		std::string pathToParentOfDest = this->getPathToParent(dest, Type::NONE);
-		if (this->findFolder(pathToParentOfDest) != -1)
+		//Detach the file from th FS
+		this->goToFolder(this->getPathToParent(source, Type::NONE));
+		File* theFile = this->detachFile(this->getNameFromPath(source, Type::NONE));
+
+		theFile->name = this->getNameFromPath(dest, Type::NONE);
+		if (pathExists(this->getPathToParent(dest, Type::NONE)))
 		{
-			this->goToFolder(pathToParentOfDest); //Move to desired directory
-			this->currentFolder->children.push_back(theFile); //Place chosen file in this directory
+			//Place chosen file in this directory
+			this->goToFolder(this->getPathToParent(dest, Type::NONE));
+			this->currentFolder->children.push_back(theFile); 
 			result = true;
 		}
 	}
+
 	this->currentFolder = mem; //Return to starting directory
 	return result;
 }

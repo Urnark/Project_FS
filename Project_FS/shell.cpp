@@ -23,7 +23,7 @@ void format(FileSystem* &fs);
 void ls(FileSystem* &fs, std::string cmdArr[], int nrOfCommands);
 void create(FileSystem* &fs, std::string cmdArr[]);
 void cat(FileSystem* &fs, std::string cmdArr[]);
-void rm(FileSystem* &fs, std::string cmdArr[]);
+void rm(FileSystem* &fs, std::string cmdArr[], std::string &currentDir);
 void cp(FileSystem* &fs, std::string cmdArr[]);
 void append(FileSystem* &fs, std::string cmdArr[]);
 void mv(FileSystem* &fs, std::string cmdArr[]);
@@ -33,7 +33,7 @@ void pwd(FileSystem* &fs, std::string cmdArr[]);
 void chmod(FileSystem* &fs, std::string cmdArr[]);
 
 int main(void) {
-	//_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
 	std::string userCommand, commandArr[MAXCOMMANDS];
 	std::string user = "user@DV1492";    // Change this if you want another user to be displayed
@@ -218,7 +218,7 @@ void cat(FileSystem* & fs, std::string cmdArr[])
 	std::cout << fs->getblockString(fs->nameToPath(cmdArr[1])) << std::endl;
 }
 
-void rm(FileSystem* & fs, std::string cmdArr[])
+void rm(FileSystem* & fs, std::string cmdArr[], std::string &currentDir)
 {
 	if (fs == nullptr)
 	{
@@ -237,6 +237,7 @@ void rm(FileSystem* & fs, std::string cmdArr[])
 		{
 			done = fs->removeFolder(path);
 		}
+		currentDir = fs->getCurrentPath();
 	}
 	if (!done)
 	{

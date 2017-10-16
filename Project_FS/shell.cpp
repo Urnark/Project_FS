@@ -3,11 +3,11 @@
 #include "filesystem.h"
 
 const int MAXCOMMANDS = 8;
-const int NUMAVAILABLECOMMANDS = 15;
+const int NUMAVAILABLECOMMANDS = 16;
 
 std::string availableCommands[NUMAVAILABLECOMMANDS] = {
     "quit","format","ls","create","cat","createImage","restoreImage",
-    "rm","cp","append","mv","mkdir","cd","pwd","help"
+    "rm","cp","append","mv","mkdir","cd","pwd","chmod","help"
 };
 
 /* Takes usercommand from input and returns number of commands, commands are stored in strArr[] */
@@ -30,9 +30,10 @@ void mv(FileSystem* &fs, std::string cmdArr[]);
 void mkdir(FileSystem* &fs, std::string cmdArr[]);
 void cd(FileSystem* &fs, std::string cmdArr[], std::string &currentDir);
 void pwd(FileSystem* &fs, std::string cmdArr[]);
+void chmod(FileSystem* &fs, std::string cmdArr[]);
 
 int main(void) {
-	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+	//_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
 	std::string userCommand, commandArr[MAXCOMMANDS];
 	std::string user = "user@DV1492";    // Change this if you want another user to be displayed
@@ -48,12 +49,11 @@ int main(void) {
 
         int nrOfCommands = parseCommandString(userCommand, commandArr);
         if (nrOfCommands > 0) {
-
             int cIndex = findCommand(commandArr[0]);
             switch(cIndex) {
 
 			case 0: //quit
-				bRun = quit();                
+				bRun = quit();
                 break;
             case 1: // format
 				format(fs);
@@ -92,7 +92,10 @@ int main(void) {
             case 13: // pwd
 				pwd(fs, commandArr);
                 break;
-            case 14: // help
+            case 14: // chmod
+                chmod(fs, commandArr);
+                break;
+            case 15: // help
                 std::cout << help() << std::endl;
                 break;
             default:
@@ -149,6 +152,7 @@ std::string help() {
     helpStr += "* mkdir  <directory>:               Creates a new directory called <directory>\n";
     helpStr += "* cd     <directory>:               Changes current working directory to <directory>\n";
     helpStr += "* pwd:                              Get current working directory\n";
+    helpStr += "* chmod <permission> <file>:        Change access rights for a file\n";
     helpStr += "* help:                             Prints this help screen\n";
     return helpStr;
 }
@@ -167,7 +171,7 @@ void errFS(std::string cmdArr[])
 void format(FileSystem* &fs)
 {
 	if (fs != nullptr) delete fs;
-	fs = new FileSystem(); // Tror detta borde fungera bättre i denn situation
+	fs = new FileSystem(); // Tror detta borde fungera bï¿½ttre i denn situation
 	//fs.removeFolder("/");
 }
 
@@ -194,7 +198,11 @@ void create(FileSystem* & fs, std::string cmdArr[])
 	std::cout << "Enter data: ";
 	std::string data = "";
 	getline(std::cin, data);
-	if (!fs->create(fs->nameToPath(cmdArr[1]), data))
+	
+	// create a new file
+	std::string path = fs->nameToPath(cmdArr[1]);
+	// Check if the path to the directory that the file shall be in exist
+	if (!fs->createFile(path, data))
 	{
 		errSyntax(cmdArr);
 	}
@@ -217,7 +225,23 @@ void rm(FileSystem* & fs, std::string cmdArr[])
 		errFS(cmdArr);
 		return;
 	}
-	fs->removeFile(fs->nameToPath(cmdArr[1]));
+	bool done = false;
+	std::string path = fs->nameToPath(cmdArr[1]);
+	if (fs->pathExists(path))
+	{
+		if (fs->getFile(path) != nullptr) // is a file
+		{
+			done = fs->removeFile(path);
+		}
+		else // is a folder
+		{
+			done = fs->removeFolder(path);
+		}
+	}
+	if (!done)
+	{
+		errSyntax(cmdArr);
+	}
 }
 
 void cp(FileSystem *& fs, std::string cmdArr[])
@@ -227,7 +251,25 @@ void cp(FileSystem *& fs, std::string cmdArr[])
 		errFS(cmdArr);
 		return;
 	}
-	fs->cp(fs->nameToPath(cmdArr[1]), fs->nameToPath(cmdArr[2]));
+
+	std::string oldPath = fs->nameToPath(cmdArr[1]);
+	std::string newPath = fs->nameToPath(cmdArr[2]);
+	bool result = false;
+	if (fs->pathExists(oldPath))// Check if the old path exist
+	{
+		// Check if the new path to the folder of the new file exist
+		std::string pathToParentOfNewPath = fs->getPathToParent(newPath);
+		if (fs->pathExists(pathToParentOfNewPath))
+		{
+			fs->createFile(newPath, fs->getblockString(oldPath));
+			result = true;
+		}
+	}
+
+	if (!result)
+	{
+		errSyntax(cmdArr);
+	}
 }
 
 void append(FileSystem *& fs, std::string cmdArr[])
@@ -237,7 +279,20 @@ void append(FileSystem *& fs, std::string cmdArr[])
 		errFS(cmdArr);
 		return;
 	}
-	fs->append(fs->nameToPath(cmdArr[1]), fs->nameToPath(cmdArr[2]));
+	//fs->append(fs->nameToPath(cmdArr[1]), fs->nameToPath(cmdArr[2]));
+	std::string source = fs->nameToPath(cmdArr[1]);
+	std::string dest = fs->nameToPath(cmdArr[2]);
+	if (fs->pathExists(source) && fs->pathExists(dest))// Check if the paths exists
+	{
+		std::string dataDest = fs->getblockString(dest);
+		fs->removeFile(dest);
+		std::string newData = dataDest + fs->getblockString(source);
+		fs->createFile(dest, newData);
+	}
+	else
+	{
+		errSyntax(cmdArr);
+	}
 }
 
 void mv(FileSystem* & fs, std::string cmdArr[])
@@ -247,7 +302,22 @@ void mv(FileSystem* & fs, std::string cmdArr[])
 		errFS(cmdArr);
 		return;
 	}
-	fs->move(fs->nameToPath(cmdArr[1]), fs->nameToPath(cmdArr[2]));
+	//fs->move(fs->nameToPath(cmdArr[1]), fs->nameToPath(cmdArr[2]));
+
+	std::string oldPath = fs->nameToPath(cmdArr[1]);
+	std::string newPath = fs->nameToPath(cmdArr[2]);
+	bool result = false;
+	if (fs->pathExists(oldPath))// Check if the old path exist
+	{
+		// Check if the new path to the folder of the new file exist
+		std::string pathToParentOfNewPath = fs->getPathToParent(newPath);
+		if (fs->pathExists(pathToParentOfNewPath))
+		{
+			fs->createFile(newPath, fs->getblockString(oldPath));
+			fs->removeFile(oldPath);
+			result = true;
+		}
+	}
 }
 
 void mkdir(FileSystem* & fs, std::string cmdArr[])
@@ -257,7 +327,10 @@ void mkdir(FileSystem* & fs, std::string cmdArr[])
 		errFS(cmdArr);
 		return;
 	}
-	fs->createFolder(fs->nameToPath(cmdArr[1]));
+	if (!fs->createFolder(fs->nameToPath(cmdArr[1])))
+	{
+		errSyntax(cmdArr);
+	}
 }
 
 void cd(FileSystem* & fs, std::string cmdArr[], std::string &currentDir)
@@ -267,8 +340,15 @@ void cd(FileSystem* & fs, std::string cmdArr[], std::string &currentDir)
 		errFS(cmdArr);
 		return;
 	}
-	if (!fs->cd(fs->nameToPath(cmdArr[1]), currentDir))
-		std::cout << "The path do not exists in the filesystem" << std::endl;
+	// Change directory
+	std::string path = fs->nameToPath(cmdArr[1]);
+	if (fs->pathExists(fs->getPathToParent(path)))
+	{
+		fs->goToFolder(path);
+		currentDir = fs->getCurrentPath();
+	}else{
+		std::cout << "The path does not exist in the filesystem" << std::endl;
+	}
 }
 
 void pwd(FileSystem* & fs, std::string cmdArr[])
@@ -278,5 +358,18 @@ void pwd(FileSystem* & fs, std::string cmdArr[])
 		errFS(cmdArr);
 		return;
 	}
-	std::cout << fs->getCurrentFilePath() << std::endl;
+	std::cout << fs->getCurrentPath() << std::endl;
+}
+
+void chmod(FileSystem* & fs, std::string cmdArr[])
+{
+	if (fs == nullptr)
+	{
+		errFS(cmdArr);
+		return;
+	}
+	if (!fs->chmod(atoi(cmdArr[1].c_str()), fs->nameToPath(cmdArr[2])))
+	{
+		errSyntax(cmdArr);
+	}
 }

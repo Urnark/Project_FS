@@ -19,6 +19,8 @@ std::string help();
 /* More functions ... */
 void errSyntax(std::string cmdArr[]);
 void errFS(std::string cmdArr[]);
+void errNR(std::string file);
+void errNW(std::string file);
 void format(FileSystem* &fs);
 void ls(FileSystem* &fs, std::string cmdArr[], int nrOfCommands);
 void create(FileSystem* &fs, std::string cmdArr[]);
@@ -68,11 +70,13 @@ int main(void) {
 				cat(fs, commandArr);
                 break;
             case 5: // createImage
+				fs->createImage();
                 break;
             case 6: // restoreImage
+				fs->restoreImage();
                 break;
             case 7: // rm
-				rm(fs, commandArr);
+				rm(fs, commandArr, currentDir);
                 break;
             case 8: // cp
 				cp(fs, commandArr);
@@ -168,6 +172,16 @@ void errFS(std::string cmdArr[])
 	std::cout << "Format disk first before calling commando <" << cmdArr[0] << ">" << std::endl;
 }
 
+void errNR(std::string file)
+{
+	std::cout << "The file '" << file << "' is not readable!" << std::endl;
+}
+
+void errNW(std::string file)
+{
+	std::cout << "The file '" << file << "' is not writable!" << std::endl;
+}
+
 void format(FileSystem* &fs)
 {
 	if (fs != nullptr) delete fs;
@@ -198,7 +212,13 @@ void create(FileSystem* & fs, std::string cmdArr[])
 	std::cout << "Enter data: ";
 	std::string data = "";
 	getline(std::cin, data);
-	
+	if (data == "maxBlock")
+	{
+		data = "";
+		for (int i = 0; i < 512; i++) data += std::to_string(i % 10);
+		data += "#";
+	}
+
 	// create a new file
 	std::string path = fs->nameToPath(cmdArr[1]);
 	// Check if the path to the directory that the file shall be in exist
@@ -215,7 +235,12 @@ void cat(FileSystem* & fs, std::string cmdArr[])
 		errFS(cmdArr);
 		return;
 	}
-	std::cout << fs->getblockString(fs->nameToPath(cmdArr[1])) << std::endl;
+	FileSystem::Ret ret = FileSystem::Ret::FAILURE;
+	std::string data = fs->getblockString(fs->nameToPath(cmdArr[1]), ret);
+	if (ret == FileSystem::Ret::SUCCESS)
+		std::cout << data << std::endl;
+	else if (ret == FileSystem::Ret::NR)
+		errNR(fs->getNameFromPath(fs->nameToPath(cmdArr[1])));
 }
 
 void rm(FileSystem* & fs, std::string cmdArr[], std::string &currentDir)
@@ -225,23 +250,28 @@ void rm(FileSystem* & fs, std::string cmdArr[], std::string &currentDir)
 		errFS(cmdArr);
 		return;
 	}
-	bool done = false;
+	FileSystem::Ret ret = FileSystem::Ret::FAILURE;
 	std::string path = fs->nameToPath(cmdArr[1]);
 	if (fs->pathExists(path))
 	{
-		if (fs->getFile(path) != nullptr) // is a file
+		if (fs->isFile(path)) // is a file
 		{
-			done = fs->removeFile(path);
+			ret = fs->removeFile(path);
 		}
 		else // is a folder
 		{
-			done = fs->removeFolder(path);
+			ret = fs->removeFolder(path);
 		}
 		currentDir = fs->getCurrentPath();
 	}
-	if (!done)
+
+	if (ret == FileSystem::Ret::FAILURE)
 	{
 		errSyntax(cmdArr);
+	}
+	else if (ret == FileSystem::Ret::NW)
+	{
+		errNW(fs->getNameFromPath(path));
 	}
 }
 
@@ -252,7 +282,7 @@ void cp(FileSystem *& fs, std::string cmdArr[])
 		errFS(cmdArr);
 		return;
 	}
-
+	FileSystem::Ret ret = FileSystem::Ret::FAILURE;
 	std::string oldPath = fs->nameToPath(cmdArr[1]);
 	std::string newPath = fs->nameToPath(cmdArr[2]);
 	bool result = false;
@@ -262,14 +292,22 @@ void cp(FileSystem *& fs, std::string cmdArr[])
 		std::string pathToParentOfNewPath = fs->getPathToParent(newPath);
 		if (fs->pathExists(pathToParentOfNewPath))
 		{
-			fs->createFile(newPath, fs->getblockString(oldPath));
-			result = true;
+			std::string data = fs->getblockString(oldPath, ret);
+			if (ret == FileSystem::Ret::SUCCESS) // Check if the old path is readable
+			{
+				fs->createFile(newPath, data);
+				result = true;
+			}
 		}
 	}
 
 	if (!result)
 	{
 		errSyntax(cmdArr);
+	}
+	if (ret == FileSystem::Ret::NR)
+	{
+		errNR(fs->getNameFromPath(oldPath));
 	}
 }
 
@@ -280,20 +318,31 @@ void append(FileSystem *& fs, std::string cmdArr[])
 		errFS(cmdArr);
 		return;
 	}
-	//fs->append(fs->nameToPath(cmdArr[1]), fs->nameToPath(cmdArr[2]));
+	FileSystem::Ret retSource = FileSystem::Ret::FAILURE;
+	FileSystem::Ret retDest = FileSystem::Ret::FAILURE;
 	std::string source = fs->nameToPath(cmdArr[1]);
 	std::string dest = fs->nameToPath(cmdArr[2]);
 	if (fs->pathExists(source) && fs->pathExists(dest))// Check if the paths exists
 	{
-		std::string dataDest = fs->getblockString(dest);
-		fs->removeFile(dest);
-		std::string newData = dataDest + fs->getblockString(source);
-		fs->createFile(dest, newData);
+		std::string dataSource = fs->getblockString(source, retSource);
+		std::string dataDest = fs->getblockString(dest, retDest);
+		//Check reading and writing privileges
+		if (retSource == FileSystem::Ret::SUCCESS && retDest == FileSystem::Ret::SUCCESS)
+		{
+			fs->removeFile(dest);
+			std::string newData = dataDest + dataSource;
+			fs->createFile(dest, newData);
+		}
 	}
 	else
 	{
 		errSyntax(cmdArr);
 	}
+
+	if (retSource == FileSystem::Ret::NR)
+		errNR(fs->getNameFromPath(source));
+	if (retDest == FileSystem::Ret::NR)
+		errNR(fs->getNameFromPath(dest));
 }
 
 void mv(FileSystem* & fs, std::string cmdArr[])
@@ -303,22 +352,29 @@ void mv(FileSystem* & fs, std::string cmdArr[])
 		errFS(cmdArr);
 		return;
 	}
-	//fs->move(fs->nameToPath(cmdArr[1]), fs->nameToPath(cmdArr[2]));
-
+	FileSystem::Ret retOld = FileSystem::Ret::FAILURE;
 	std::string oldPath = fs->nameToPath(cmdArr[1]);
 	std::string newPath = fs->nameToPath(cmdArr[2]);
 	bool result = false;
-	if (fs->pathExists(oldPath))// Check if the old path exist
+	if (fs->pathExists(oldPath)) // Check if the old path exist and is writable
 	{
 		// Check if the new path to the folder of the new file exist
 		std::string pathToParentOfNewPath = fs->getPathToParent(newPath);
 		if (fs->pathExists(pathToParentOfNewPath))
 		{
-			fs->createFile(newPath, fs->getblockString(oldPath));
-			fs->removeFile(oldPath);
-			result = true;
+			std::string data = fs->getblockString(oldPath, retOld);
+			if (retOld == FileSystem::Ret::SUCCESS)
+			{
+				fs->createFile(newPath, data);
+				retOld = fs->removeFile(oldPath);
+				result = true;
+			}
 		}
 	}
+	if (retOld == FileSystem::Ret::NR)
+		errNR(fs->getNameFromPath(oldPath));
+	if (retOld == FileSystem::Ret::NW)
+		errNW(fs->getNameFromPath(oldPath));
 }
 
 void mkdir(FileSystem* & fs, std::string cmdArr[])

@@ -1,0 +1,10 @@
+root 1 1 2 1
+aa 1 1 1 0
+bb 1 1 0 1
+test 1 1
+data
+cc 1 1 0 1
+test2 1 1
+data2
+test3 1 1
+data3

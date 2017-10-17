@@ -1,5 +1,7 @@
 #include "filesystem.h"
 
+const std::string FileSystem::SAVE_TO_FILE = "imageFS.txt";
+
 FileSystem::FileSystem()
 {
 	this->root = new Folder("root", this->root);
@@ -12,7 +14,7 @@ FileSystem::FileSystem()
 
 FileSystem::~FileSystem()
 {
-	deleteFolder(this->root);
+	deleteFolder(this->root, true);
 }
 
 bool FileSystem::createFolder(const std::string &dirpath)
@@ -29,51 +31,45 @@ bool FileSystem::createFolder(const std::string &dirpath)
 	return done;
 }
 
-bool FileSystem::removeFile(std::string filepath)
+FileSystem::Ret FileSystem::removeFile(std::string filepath)
 {
-	bool done = false;
+	FileSystem::Ret ret = FileSystem::Ret::FAILURE;
 	std::string path = this->getPathToParent(filepath);
 	if (this->pathExists(path))
 	{
+		ret = FileSystem::Ret::SUCCESS;
 		Folder* folder = this->currentFolder;
 		this->goToFolder(path);
-		this->deleteFile(getFile(filepath));
+		ret = this->deleteFile(this->getFile(filepath));
 		this->currentFolder = folder;
-		done = true;
+		
 	}
-	return done;
+	return ret;
 }
 
-bool FileSystem::removeFolder(std::string path)
+FileSystem::Ret FileSystem::removeFolder(std::string path)
 {
-	bool done = false;
+	FileSystem::Ret ret = FileSystem::Ret::FAILURE;
 	if (this->pathExists(path))
 	{
 		this->goToFolder(path);
 		if (this->getPathToParent(path) != this->getCurrentPath() && this->root != this->currentFolder)
 		{
+			ret = FileSystem::Ret::SUCCESS;
 			Folder* parent = dynamic_cast<Folder*>(this->currentFolder->parent);
-			this->deleteFolder(this->currentFolder);
+			ret = this->deleteFolder(this->currentFolder);
 			this->currentFolder = parent;
-			done = true;
+			
 		}
 	}
-	return done;
+	return ret;
 }
 
 void FileSystem::addFile(std::string name, std::string data)
 {
 	File* newFile = dynamic_cast<File*>(this->currentFolder->addFile(name));
-	newFile->size = data.size();
 
 	int nrOfNeededBlocks = 1;
-	/*std::string tempData = data;
-	while (tempData.size() > this->mMemblockDevice[0].size())
-	{
-		nrOfNeededBlocks++;
-		tempData = tempData.substr(0,
-			(tempData.size() > this->mMemblockDevice[0].size()? tempData.size() - this->mMemblockDevice[0].size(): tempData.size()));
-	}*/
 	int dsize = data.size();
 	while (dsize > this->mMemblockDevice[0].size())
 	{
@@ -197,110 +193,56 @@ std::string FileSystem::nameToPath(const std::string & name)
 	return path;
 }
 
-/*bool FileSystem::create(const std::string & filepath, const std::string & data)
-{
-	bool done = false;
-	if (this->pathExists(this->getPathToParent(filepath, Type::NONE)))
-	{
-		this->createFile(filepath, data);
-		done = true;
-	}
-	return done;
-}*/
-
-/*bool FileSystem::cd(std::string path, std::string &currentDir)
-{
-	bool done = false;
-	if (this->pathExists(this->getPathToParent(path, Type::NONE)))
-	{
-		this->goToFolder(path);
-		currentDir = this->getCurrentPath();
-		done = true;
-	}
-	return done;
-}*/
-
-/*bool FileSystem::cp(std::string oldFilepath, std::string newFilepath)
-{
-	Folder* mem = this->currentFolder; //Remember starting directory
-
-	bool result = false;
-	if (this->pathExists(oldFilepath))// Check if the source exist
-	{
-		// the old file
-		this->goToFolder(this->getPathToParent(oldFilepath, Type::NONE));
-		File* thFile = dynamic_cast<File*>(this->currentFolder->children[this->findFile(this->getNameFromPath(oldFilepath, Type::NONE))]);
-
-		// Check if the new path to the folder of the new file exist
-		std::string pathToParentOfNewPath = this->getPathToParent(newFilepath, Type::NONE);
-		if (this->pathExists(pathToParentOfNewPath))
-		{
-			this->create(newFilepath, this->getblockString(oldFilepath));
-			result = true;
-		}
-	}
-
-	this->currentFolder = mem; //Return to starting directory
-	return result;
-}*/
-
-/*bool FileSystem::append(std::string source, std::string dest)
-{
-	Folder* mem = this->currentFolder; //Remember starting directory
-
-	bool result = false;
-	if (this->pathExists(source) && this->pathExists(dest))// Check if the paths exists
-	{
-		std::string dataDest = this->getblockString(dest);
-		this->removeFile(dest);
-		std::string newData = dataDest + this->getblockString(source);
-		this->create(dest, newData);
-		result = true;
-	}
-
-	this->currentFolder = mem; //Return to starting directory
-	return result;
-}*/
-
 /*Delete a folder and its children(inclusive the files in it)*/
-void FileSystem::deleteFolder(Folder * folder, bool start)
+FileSystem::Ret FileSystem::deleteFolder(Folder * folder, bool ignoreRW, bool start)
 {
+	FileSystem::Ret ret = FileSystem::Ret::FAILURE;
 	if (folder->children.size() != 0)
 	{
-		Folder* child = nullptr;
+		Node* child = nullptr;
 		int size = folder->children.size();
-		for (int i = 0; i < size; i++) {
-			child = dynamic_cast<Folder*>(folder->children[i]);
-			if (child != nullptr) // is a folder
+		for (int i = 0; i < size && ret != FileSystem::Ret::NW; i++) {
+			child = folder->children[i];
+			if (dynamic_cast<Folder*>(child) != nullptr) // is a folder
 			{
-				deleteFolder(child, false);
+				if (child->writable || ignoreRW)
+					deleteFolder(dynamic_cast<Folder*>(child), ignoreRW, false);
+				else
+					ret = FileSystem::Ret::NW;
 			}
 		}
 		size = folder->children.size();
-		for (int i = 0; i < size; i++) {
-			child = dynamic_cast<Folder*>(folder->children[i]);
-			if (child != nullptr) // is a folder
+		for (int i = 0; i < size && ret != FileSystem::Ret::NW; i++) {
+			child = folder->children[i];
+			if (dynamic_cast<Folder*>(child) != nullptr) // is a folder
 			{
 				delete folder->children[i];
 			}
 			else // is a file
 			{
-				this->deleteFile(dynamic_cast<File*>(folder->children[i]), folder, false);
+				if (child->writable || ignoreRW)
+					this->deleteFile(dynamic_cast<File*>(folder->children[i]), folder, false, ignoreRW);
+				else
+					ret = FileSystem::Ret::NW;
 			}
 		}
 	}
-	folder->children.clear();
-	if (start)
+	if (ret != FileSystem::Ret::NW || ignoreRW)
 	{
-		if (folder != this->root)
+		folder->children.clear();
+		if (start)
 		{
-			Folder* pFolder = dynamic_cast<Folder*>(this->currentFolder->parent);
-			this->goToFolder(this->getPath(pFolder));
-			int location = this->findFolder(folder->name);
-			pFolder->children.erase(pFolder->children.begin() + location);
+			if (folder != this->root)
+			{
+				Folder* pFolder = dynamic_cast<Folder*>(this->currentFolder->parent);
+				this->goToFolder(this->getPath(pFolder));
+				int location = this->findFolder(folder->name);
+				pFolder->children.erase(pFolder->children.begin() + location);
+			}
+			delete folder;
 		}
-		delete folder;
 	}
+	return ret;
 }
 
 /*Remove a file from the current folder and return that file*/
@@ -324,23 +266,29 @@ FileSystem::File* FileSystem::detachFile(std::string name)
 }
 
 /*Delete a file in the current folder*/
-void FileSystem::deleteFile(File * file, Folder *parent, bool erase)
+FileSystem::Ret FileSystem::deleteFile(File * file, Folder *parent, bool erase, bool ignoreRW)
 {
+	FileSystem::Ret ret = FileSystem::Ret::FAILURE;
 	if (file != nullptr)
 	{
-		if (parent == nullptr) parent = this->currentFolder;
-		Folder* mem = this->currentFolder;
-		if (erase)
+		ret = FileSystem::Ret::NW;
+		if (file->writable || ignoreRW)
 		{
-			this->currentFolder = parent;
-			int location = this->findFile(file->name);
-			parent->children.erase(parent->children.begin() + location);
-		}
-		this->freeFile(file);
-		delete file;
+			if (parent == nullptr) parent = this->currentFolder;
+			Folder* mem = this->currentFolder;
+			if (erase)
+			{
+				this->currentFolder = parent;
+				int location = this->findFile(file->name);
+				parent->children.erase(parent->children.begin() + location);
+			}
+			ret = this->freeFile(file, ignoreRW);
+			delete file;
 
-		this->currentFolder = mem;
+			this->currentFolder = mem;
+		}
 	}
+	return ret;
 }
 
 /* Change folder and return the last name in the path */
@@ -463,13 +411,20 @@ void FileSystem::parsePath(std::string &temp, std::string &path)
 }
 
 /* Free the blocks that the file uses */
-void FileSystem::freeFile(File *file)
+FileSystem::Ret FileSystem::freeFile(File *file, bool ignoreRW)
 {
-	for (int i = 0; i < file->blocks.size(); i++)
+	FileSystem::Ret ret = FileSystem::Ret::NW;
+	if (file->writable || ignoreRW)
 	{
-		this->emptyBlocks.push_back(file->blocks[i]);
+		ret = FileSystem::Ret::SUCCESS;
+		for (int i = 0; i < file->blocks.size(); i++)
+		{
+			this->mMemblockDevice[file->blocks[i]].reset();
+			this->emptyBlocks.push_back(file->blocks[i]);
+		}
+		file->blocks.clear();
 	}
-	file->blocks.clear();
+	return ret;
 }
 
 int FileSystem::posOfLastNameInPath(std::string path, Type type)
@@ -523,6 +478,60 @@ std::string FileSystem::getNameFromPath(std::string path, Type type)
 	return path.substr(i, path.size() - i);;
 }
 
+bool FileSystem::isReadable(std::string path)
+{
+	bool r = false;
+	if (this->pathExists(path))
+	{
+		File* file = this->getFile(path);
+		if (file != nullptr)
+		{
+			r = file->readable;
+		}
+		Folder* folder = this->getFolder(path);
+		if (folder != nullptr)
+		{
+			r = folder->readable;
+		}
+	}
+	return r;
+}
+
+bool FileSystem::isWritable(std::string path)
+{
+	bool w = false;
+	if (this->pathExists(path))
+	{
+		File* file = this->getFile(path);
+		if (file != nullptr)
+		{
+			w = file->writable;
+		}
+		Folder* folder = this->getFolder(path);
+		if (folder != nullptr)
+		{
+			w = folder->writable;
+		}
+	}
+	return w;
+}
+
+bool FileSystem::isFile(const std::string & path)
+{
+	bool is = false;
+	if (this->getFile(path) != nullptr)
+		is = true;
+	return is;
+}
+
+bool FileSystem::isFolder(const std::string & path)
+{
+	bool is = false;
+	if (this->getFile(path) == nullptr)
+		is = true;
+	return is;
+}
+
 FileSystem::File* FileSystem::getFile(const std::string & path)
 {
 	Folder* mem = this->currentFolder; //Remember starting directory
@@ -530,13 +539,31 @@ FileSystem::File* FileSystem::getFile(const std::string & path)
 	if (this->pathExists(path))// Check if the source exist
 	{
 		this->goToFolder(this->getPathToParent(path));
-		if (this->findFile(this->getNameFromPath(path)) != -1)
+		int location = this->findFile(this->getNameFromPath(path));
+		if (location != -1)
 		{
-			file = dynamic_cast<File*>(this->currentFolder->children[this->findFile(this->getNameFromPath(path))]);
+			file = dynamic_cast<File*>(this->currentFolder->children[location]);
 		}
 	}
 	this->currentFolder = mem; // Return to starting directory
 	return file;
+}
+
+FileSystem::Folder* FileSystem::getFolder(const std::string & path)
+{
+	Folder* mem = this->currentFolder; //Remember starting directory
+	Folder* folder = nullptr;
+	if (this->pathExists(path))// Check if the source exist
+	{
+		this->goToFolder(this->getPathToParent(path));
+		int location = this->findFolder(this->getNameFromPath(path));
+		if (location != -1)
+		{
+			folder = dynamic_cast<Folder*>(this->currentFolder->children[location]);
+		}
+	}
+	this->currentFolder = mem; // Return to starting directory
+	return folder;
 }
 
 std::string FileSystem::getPath(Folder * folder)
@@ -555,68 +582,70 @@ std::string FileSystem::getPath(Folder * folder)
 	return path;
 }
 
+std::string FileSystem::setw(unsigned int val)
+{
+	std::string str = "";
+	for (int i = 0; i < val; i++)
+	{
+		str += " ";
+	}
+	return str;
+}
+
 std::string FileSystem::displayChildren(std::string path)
 {
+	if (path == "./") path = this->getCurrentPath();
+
 	std::string result = "";
-	if (path == "./")
+	Folder* mem = this->currentFolder;
+
+	this->goToFolder(path);
+	if (this->currentFolder != this->root)
+		path = this->getCurrentPath();
+	result = "Type      Name      Permissions    Size\n";
+	std::string type = "DIR";
+	Node* node = nullptr;
+	for (int i = 0; i < this->currentFolder->children.size(); i++)
 	{
-		for (int i = 0; i < this->currentFolder->children.size(); i++)
+		node = this->currentFolder->children[i];
+		int size = 0;
+		type = "DIR";
+		
+		if (dynamic_cast<File*>(node) != nullptr)
 		{
-			result += " " + this->currentFolder->children[i]->name;
-			if (dynamic_cast<File*>(this->currentFolder->children[i]) != nullptr)
-			{
-				int size = 0;
-				for (int j = 0; j < dynamic_cast<File*>(this->currentFolder->children[i])->blocks.size(); j++)
-				{
-					size += mMemblockDevice[dynamic_cast<File*>(this->currentFolder->children[i])->blocks[j]].size();
-				}
-				result += "(" + std::to_string(size) + "B)";
-			}
+			FileSystem::Ret ret = FileSystem::Ret::FAILURE;
+			std::string temp = this->getblockString(path + "/" + node->name, ret);
+			size = temp.size();
+			type = "FILE";
 		}
+		std::string rw = "";
+		if (this->isReadable(path + "/" + node->name)) rw += "R";
+		if (this->isWritable(path + "/" + node->name)) rw += "W";
+
+		result += type + this->setw(10 - type.size()) + 
+			this->currentFolder->children[i]->name + this->setw(10 - this->currentFolder->children[i]->name.size()) +
+			rw + this->setw(15 - rw.size()) + std::to_string(size) + "\n";
 	}
-	else
-	{
-		Folder* mem = this->currentFolder;
-		this->goToFolder(path);
-		result = "Type      Name      Permissions      Size\n";
-		std::string type = "DIR";
-		File* file = nullptr;
-		for (int i = 0; i < this->currentFolder->children.size(); i++)
-		{
-			file = dynamic_cast<File*>(this->currentFolder->children[i]);
-			int size = 0;
-			type = "DIR";
-			if (file != nullptr)
-			{
-				type = "FILE";
-				for (int j = 0; j < file->blocks.size(); j++)
-				{
-					size += mMemblockDevice[file->blocks[j]].size();
-				}
-			}
-			result += type + "      " + this->currentFolder->children[i]->name + "      " +
-				"?" + "      " + std::to_string(size) + "\n";
-		}
-		this->currentFolder = mem;
-	}
+	this->currentFolder = mem;
 
 	return result;
 }
 
-std::string FileSystem::getblockString(std::string path)
+std::string FileSystem::getblockString(std::string path, FileSystem::Ret &ret)
 {
-	std::string result = "?";
+	std::string result = "";
 	Folder* mem = this->currentFolder;
 
+	ret = FileSystem::Ret::FAILURE;
 	if (this->pathExists(path))
 	{
 		this->goToFolder(this->getPathToParent(path, Type::FILE));
 		int location = this->findFile(this->getNameFromPath(path, Type::FILE));
 		File* file = dynamic_cast<File*>(this->currentFolder->children[location]);
 
+		ret = FileSystem::Ret::NR;
 		if (file->readable)
 		{
-			result = "";
 			for (int i = 0; i < file->blocks.size(); i++)
 			{
 				std::string data = mMemblockDevice.readBlock(dynamic_cast<File*>(this->currentFolder->children[location])->blocks[i]).toString();
@@ -630,6 +659,7 @@ std::string FileSystem::getblockString(std::string path)
 				}
 				result += data;
 			}
+			ret = FileSystem::Ret::SUCCESS;
 		}
 	}
 	this->currentFolder = mem;
@@ -654,58 +684,167 @@ std::string FileSystem::getCurrentPath()
 	return result;
 }
 
-/*bool FileSystem::move(std::string source, std::string dest) //source includes a file name, dest is a directory (and the name of the new file)
-{
-	Folder* mem = this->currentFolder; //Remember starting directory
-
-	bool result = false;
-	if (this->pathExists(source))
-	{
-		//Detach the file from th FS
-		this->goToFolder(this->getPathToParent(source, Type::NONE));
-		File* theFile = this->detachFile(this->getNameFromPath(source, Type::NONE));
-
-		theFile->name = this->getNameFromPath(dest, Type::NONE);
-		if (pathExists(this->getPathToParent(dest, Type::NONE)))
-		{
-			//Place chosen file in this directory
-			this->goToFolder(this->getPathToParent(dest, Type::NONE));
-			this->currentFolder->children.push_back(theFile);
-			result = true;
-		}
-	}
-
-	this->currentFolder = mem; //Return to starting directory
-	return result;
-}*/
-
 bool FileSystem::chmod(int val, std::string path)
 {
     Folder* mem = this->currentFolder;
 	File* theFile = this->getFile(path);
 
-    if (val == 1) {
+    if (val == 1) { // 11
         theFile->readable = true;
         theFile->writable = true;
     }
-    else if (val == 2) {
+    else if (val == 2) { // 10
         theFile->readable = true;
         theFile->writable = false;
     }
-    else if (val == 3) {
+    else if (val == 3) { // 01
         theFile->readable = false;
         theFile->writable = true;
     }
-    else if (val == 4) {
+    else if (val == 4) { // 00
         theFile->readable = false;
         theFile->writable = false;
     }
-    else {
-			  this->currentFolder = mem;
+    else 
+	{
+		this->currentFolder = mem;
         return false;
     }
     this->currentFolder = mem;
 	return true;
+}
+
+void FileSystem::save(std::ofstream &os, Folder* parent, Node* node)
+{
+	if (parent == nullptr)
+	{
+		node = this->root;
+		parent = dynamic_cast<Folder*>(this->root);
+	}
+
+	os << node->name << " " << node->readable << " " << node->writable;
+	if (dynamic_cast<Folder*>(node) != nullptr)
+	{
+		Folder* folder = dynamic_cast<Folder*>(node);
+		parent = folder;
+		int folders = 0;
+		int files = 0;
+		for (int i = 0; i < folder->children.size(); i++)
+		{
+			if (dynamic_cast<Folder*>(folder->children[i]))
+				folders++;
+			else
+				files++;
+		}
+		os << " " << folders << " " << files << "\n";
+		for (int i = 0; i < folder->children.size(); i++)
+		{
+			save(os, parent, folder->children[i]);
+		}
+	}
+	else
+	{
+		File* file = dynamic_cast<File*>(node);
+		FileSystem::Ret ret = FileSystem::Ret::FAILURE;
+		std::string path = this->getPath(parent) + "/" + file->name;
+		if (parent == this->root) path = "/" + file->name;
+		os << "\n" << this->getblockString(path, ret) << "\n";
+	}
+}
+
+void FileSystem::load(std::ifstream &is, int index, Folder* parent, Node* node)
+{
+	std::string line;
+	getline(is, line);
+	std::stringstream ssin(line);
+	std::string word[5];
+	int wordi = 0;
+	while (ssin.good()) {
+		ssin >> word[wordi];
+		wordi++;
+	}
+	std::string path = this->getPath(parent) + "/" + std::to_string(index);
+	if (parent == this->root) path = "/" + std::to_string(index);
+	if (wordi == 5) // is a file
+	{
+		this->removeFolder(path);
+		path = this->getPath(parent) + "/" + word[0];
+		if (parent == this->root) path = "/" + word[0];
+		this->createFolder(path);
+		node = this->getFolder(path);
+		node->readable = std::atoi(word[1].c_str());
+		node->writable = std::atoi(word[2].c_str());
+		int nrOfFolders = std::atoi(word[3].c_str());
+		int nrOfFiles = std::atoi(word[4].c_str());
+		parent = dynamic_cast<Folder*>(node);
+		for (int i = 0; i < nrOfFolders; i++)
+		{
+			this->createFolder(path + "/" + std::to_string(i));
+			load(is, i, parent, this->getFolder(path + "/" + std::to_string(i)));
+		}
+		for (int i = 0; i < nrOfFiles; i++)
+		{
+			this->createFile(path + "/" + std::to_string(nrOfFolders + i), "");
+			load(is, nrOfFolders + i, parent, this->getFile(path + "/" + std::to_string(nrOfFolders + i)));
+		}
+	}
+	else
+	{
+		this->removeFile(path);
+		path = this->getPath(parent) + "/" + word[0];
+		if (parent == this->root) path = "/" + word[0];
+		getline(is, line);
+		this->createFile(path, line);
+		node = this->getFile(path);
+		node->readable = std::atoi(word[1].c_str());
+		node->writable = std::atoi(word[2].c_str());
+	}
+
+}
+
+void FileSystem::createImage()
+{
+	std::ofstream os(FileSystem::SAVE_TO_FILE);
+	if (os.is_open())
+	{
+		save(os);
+		os.close();
+	}
+}
+
+void FileSystem::restoreImage()
+{
+	std::ifstream is(FileSystem::SAVE_TO_FILE);
+	if (is.is_open())
+	{
+		std::string line;
+		getline(is, line);
+		std::stringstream ssin(line);
+		std::string word[5];
+		int index = 0;
+		while (ssin.good()) {
+			ssin >> word[index];
+			index++;
+		}
+		this->root->name = word[0];
+		this->root->readable = std::atoi(word[1].c_str());
+		this->root->writable = std::atoi(word[2].c_str());
+		int nrOfFolders = std::atoi(word[3].c_str());
+		int nrOfFiles = std::atoi(word[4].c_str());
+		Folder* parent = dynamic_cast<Folder*>(this->root);
+		for (int i = 0; i < nrOfFolders; i++)
+		{
+			this->createFolder("/" + std::to_string(i));
+			load(is, i, parent, this->getFolder("/" + std::to_string(i)));
+		}
+		for (int i = 0; i < nrOfFiles; i++)
+		{
+			this->createFile("/" + std::to_string(nrOfFolders + i), "");
+			load(is, nrOfFolders + i, parent, this->getFile("/" + std::to_string(nrOfFolders + i)));
+		}
+		is.close();
+	}
+	this->currentFolder = this->root;
 }
 
 /* Please insert your code */

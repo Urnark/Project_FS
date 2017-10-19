@@ -93,8 +93,8 @@ public:
 	~FileSystem();
 
 	/* Own functions */
-	std::string getPathToParent(std::string path, Type type = Type::NONE);
-	std::string getNameFromPath(std::string path, Type type = Type::NONE);
+	std::string getPathToParent(std::string path);
+	std::string getNameFromPath(std::string path);
 	bool isReadable(std::string path);
 	bool isWritable(std::string path);
 	bool isFile(const std::string &path);

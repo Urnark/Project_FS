@@ -305,6 +305,8 @@ void cat(FileSystem* & fs, std::string cmdArr[], int nrOfCommands)
 			std::cout << data << std::endl;
 		else if (ret == FileSystem::Ret::NR)
 			errNR(fs->getNameFromPath(path));
+		else
+			errSyntax(cmdArr);
 	}
 	else
 	{

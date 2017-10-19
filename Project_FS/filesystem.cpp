@@ -446,9 +446,9 @@ int FileSystem::posOfLastNameInPath(std::string path, Type type)
 	return i;
 }
 
-std::string FileSystem::getPathToParent(std::string path, Type type)
+std::string FileSystem::getPathToParent(std::string path)
 {
-	int i = this->posOfLastNameInPath(path, type);
+	int i = this->posOfLastNameInPath(path, Type::NONE);
 	int nrOfSlash = 0;
 	for (int i = 0; i < path.size(); i++)
 	{
@@ -462,9 +462,9 @@ std::string FileSystem::getPathToParent(std::string path, Type type)
 	return path.substr(0, i);
 }
 
-std::string FileSystem::getNameFromPath(std::string path, Type type)
+std::string FileSystem::getNameFromPath(std::string path)
 {
-	int i = this->posOfLastNameInPath(path, type);
+	int i = this->posOfLastNameInPath(path, Type::NONE);
 	return path.substr(i, path.size() - i);;
 }
 
@@ -604,10 +604,10 @@ std::string FileSystem::getblockString(std::string path, FileSystem::Ret &ret)
 	Folder* mem = this->currentFolder;
 
 	ret = FileSystem::Ret::FAILURE;
-	if (this->pathExists(path))
+	if (this->pathExists(path) && this->isFile(path))
 	{
-		this->goToFolder(this->getPathToParent(path, Type::FILE));
-		int location = this->findFile(this->getNameFromPath(path, Type::FILE));
+		this->goToFolder(this->getPathToParent(path));
+		int location = this->findFile(this->getNameFromPath(path));
 		File* file = dynamic_cast<File*>(this->currentFolder->children[location]);
 
 		ret = FileSystem::Ret::NR;

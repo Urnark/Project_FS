@@ -268,13 +268,6 @@ void create(FileSystem* & fs, std::string cmdArr[], int nrOfCommands)
 	std::string data = "";
 	getline(std::cin, data);
 
-	if (data == "mb1") // For testing. make so data = block.size + 1, 
-	{						// so the file take up two block for the data
-		data = "";
-		for (int i = 0; i < 512; i++) data += std::to_string(i % 10);
-		data += "#";
-	}
-
 	// create a new file
 	std::string path = fs->nameToPath(cmdArr[1]);
 	// Check if the path to the directory that the file shall be in exist

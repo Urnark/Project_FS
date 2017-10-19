@@ -366,7 +366,10 @@ void rm(FileSystem* & fs, std::string cmdArr[], std::string &currentDir, int nrO
 	}
 	else if (ret == FileSystem::Ret::NW)
 	{
-		errNW(fs->getNameFromPath(path));
+		if (fs->isFolder(path))
+			std::cout << "The folder has folders or files that is not writable!" << std::endl;
+		else
+			errNW(fs->getNameFromPath(path));
 	}
 }
 

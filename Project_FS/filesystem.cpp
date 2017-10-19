@@ -674,30 +674,37 @@ bool FileSystem::chmod(int val, std::string path)
 {
     Folder* mem = this->currentFolder;
 	File* theFile = this->getFile(path);
-
-    if (val == 1) { // 11
-        theFile->readable = true;
-        theFile->writable = true;
-    }
-    else if (val == 2) { // 10
-        theFile->readable = true;
-        theFile->writable = false;
-    }
-    else if (val == 3) { // 01
-        theFile->readable = false;
-        theFile->writable = true;
-    }
-    else if (val == 4) { // 00
-        theFile->readable = false;
-        theFile->writable = false;
-    }
-    else 
+	bool result = false;
+	if (theFile != nullptr)
 	{
-		this->currentFolder = mem;
-        return false;
-    }
+		if (val == 1) { // 11
+			theFile->readable = true;
+			theFile->writable = true;
+			result = true;
+		}
+		else if (val == 2) { // 10
+			theFile->readable = true;
+			theFile->writable = false;
+			result = true;
+		}
+		else if (val == 3) { // 01
+			theFile->readable = false;
+			theFile->writable = true;
+			result = true;
+		}
+		else if (val == 4) { // 00
+			theFile->readable = false;
+			theFile->writable = false;
+			result = true;
+		}
+		else
+		{
+			this->currentFolder = mem;
+			return false;
+		}
+	}
     this->currentFolder = mem;
-	return true;
+	return result;
 }
 
 void FileSystem::save(std::ofstream &os, Folder* parent, Node* node)

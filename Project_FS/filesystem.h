@@ -100,7 +100,7 @@ public:
 	bool isFile(const std::string &path);
 	bool isFolder(const std::string &path);
 	int fileSize(const std::string &path);
-	std::string absolutePathfromPath(const std::string &path);
+	std::string absolutePathFromPath(const std::string &path);
 	bool pathExists(std::string path);
 	std::string nameToPath(const std::string &name);
 

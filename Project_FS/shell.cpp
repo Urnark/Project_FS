@@ -210,7 +210,7 @@ void ls(FileSystem* &fs, std::string cmdArr[], int nrOfCommands)
 	{
 		
 		std::vector<FileSystem::Node> list = fs->listDir(path);
-		path = fs->absolutePathfromPath(path);
+		path = fs->absolutePathFromPath(path);
 		std::string result = "";
 		FileSystem::Node node;
 		int mNameSize = 10;

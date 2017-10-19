@@ -535,7 +535,7 @@ int FileSystem::fileSize(const std::string & path)
 	return temp.size();
 }
 
-std::string FileSystem::absolutePathfromPath(const std::string & path)
+std::string FileSystem::absolutePathFromPath(const std::string & path)
 {
 	std::string absPath = "/";
 	if (this->pathExists(path))

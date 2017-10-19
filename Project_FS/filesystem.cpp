@@ -175,35 +175,39 @@ FileSystem::Ret FileSystem::deleteFolder(Folder * folder, bool ignoreRW, bool st
 	if (folder->children.size() != 0)
 	{
 		Node* child = nullptr;
-		int size = folder->children.size();
-		for (int i = 0; i < size && ret != FileSystem::Ret::NW; i++) {
-			child = folder->children[i];
-			if (dynamic_cast<Folder*>(child) != nullptr) // is a folder
-			{
-				if (child->writable || ignoreRW)
-					deleteFolder(dynamic_cast<Folder*>(child), ignoreRW, false);
-				else
-					ret = FileSystem::Ret::NW;
-			}
+		if (start && !ignoreRW)
+		{
+			if (this->isW(folder))
+				ret = FileSystem::Ret::NW;
 		}
-		size = folder->children.size();
-		for (int i = 0; i < size && ret != FileSystem::Ret::NW; i++) {
-			child = folder->children[i];
-			if (dynamic_cast<Folder*>(child) != nullptr) // is a folder
-			{
-				delete folder->children[i];
+		
+		if (ret != FileSystem::Ret::NW || ignoreRW)
+		{
+			int size = folder->children.size();
+			for (int i = 0; i < size; i++) {
+				child = folder->children[i];
+				if (dynamic_cast<Folder*>(child) != nullptr) // is a folder
+				{
+					deleteFolder(dynamic_cast<Folder*>(child), ignoreRW, false);
+				}
 			}
-			else // is a file
-			{
-				if (child->writable || ignoreRW)
+			size = folder->children.size();
+			for (int i = 0; i < size; i++) {
+				child = folder->children[i];
+				if (dynamic_cast<Folder*>(child) != nullptr) // is a folder
+				{
+					delete folder->children[i];
+				}
+				else // is a file
+				{
 					this->deleteFile(dynamic_cast<File*>(folder->children[i]), folder, false, ignoreRW);
-				else
-					ret = FileSystem::Ret::NW;
+				}
 			}
 		}
 	}
 	if (ret != FileSystem::Ret::NW || ignoreRW)
 	{
+		ret = FileSystem::Ret::SUCCESS;
 		folder->children.clear();
 		if (start)
 		{
@@ -238,6 +242,21 @@ FileSystem::File* FileSystem::detachFile(std::string name)
 	}
 
 	return file;
+}
+
+bool FileSystem::isW(Folder * folder)
+{
+	bool nw = false;
+	for (int i = 0; i < folder->children.size() && !nw; i++)
+	{
+		if (!folder->children[i]->writable)
+			nw = true;
+		else if (dynamic_cast<Folder*>(folder->children[i]) != nullptr)
+		{
+			nw = isW(dynamic_cast<Folder*>(folder->children[i]));
+		}
+	}
+	return nw;
 }
 
 /*Delete a file in the current folder*/

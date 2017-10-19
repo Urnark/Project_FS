@@ -8,19 +8,6 @@
 
 #include "memblockdevice.h"
 
-/*
-	root 1 1 2 1
-	aa 1 1 1 0
-	bb 1 1 0 1
-	test 1 1 
-	data
-	cc 1 1 0 1
-	test2 1 1 
-	data2
-	test3 1 1
-	data3
-*/
-
 class FileSystem
 {
 public:
@@ -77,6 +64,7 @@ private:
 	Ret deleteFolder(Folder* folder, bool ignoreRW = false, bool start = true);
 	Ret deleteFile(File* file, Folder *parent = nullptr, bool erase = true, bool ignoreRW = false);
 	File* detachFile(std::string name);
+	bool isW(Folder* folder);
 
 	int findFolder(std::string name) const;
 	int findFile(std::string name) const;
@@ -137,7 +125,6 @@ public:
 
 	void createImage();
 	void restoreImage();
-	/* Add your own member-functions if needed */
 };
 
 #endif // FILESYSTEM_H

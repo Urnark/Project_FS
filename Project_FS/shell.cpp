@@ -208,7 +208,6 @@ void ls(FileSystem* &fs, std::string cmdArr[], int nrOfCommands)
 	if (nrOfCommands > 1) path = fs->nameToPath(cmdArr[1]);
 	if ((path == "./"? true : fs->isFolder(path)))
 	{
-		
 		std::vector<FileSystem::Node> list = fs->listDir(path);
 		path = fs->absolutePathFromPath(path);
 		std::string result = "";
@@ -229,14 +228,15 @@ void ls(FileSystem* &fs, std::string cmdArr[], int nrOfCommands)
 			int size = 0;
 			type = "DIR";
 
-			if (dynamic_cast<FileSystem::File*>(&node) != nullptr)
+			std::string p = (path == "/" ? "" : path) + "/" + node.name;
+			if (fs->isFile(p))
 			{
-				size = fs->fileSize((path == "/" ? "" : path) + "/" + node.name);
+				size = fs->fileSize(p);
 				type = "FILE";
 			}
 			std::string rw = "";
-			if (fs->isReadable((path == "/" ? "" : path) + "/" + node.name)) rw += "R";
-			if (fs->isWritable((path == "/" ? "" : path) + "/" + node.name)) rw += "W";
+			if (fs->isReadable(p)) rw += "R";
+			if (fs->isWritable(p)) rw += "W";
 
 			result += type + setw(10 - type.size()) +
 				node.name + setw(mNameSize - node.name.size()) +

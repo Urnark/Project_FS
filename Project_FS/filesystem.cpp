@@ -101,31 +101,6 @@ void FileSystem::addFile(std::string name, std::string data)
 	}
 }
 
-/*Remove a folder from the FS and return it(unmount)*/
-FileSystem::Folder* FileSystem::unmountFolder(std::string fileName)
-{
-	Folder* result = nullptr;
-	// Search for right folder
-	Folder* child = nullptr;
-	int location = -1;
-	for (int i = 0; i < this->currentFolder->children.size() && location == -1; i++) {
-		child = dynamic_cast<Folder*>(this->currentFolder->children[i]);
-		if (fileName == child->name) {
-			location = i;
-		}
-	}
-
-	//uemount from FS
-	if (location != -1)
-	{
-		result = dynamic_cast<Folder*>(this->currentFolder->children[location]);
-		this->currentFolder->children.erase(this->currentFolder->children.begin() + location);
-	}
-
-	//Returns a nullptr if not found
-	return result;
-}
-
 bool FileSystem::pathExists(std::string path)
 {
 	bool exist = true;
@@ -332,6 +307,21 @@ std::string FileSystem::goToFolder(std::string path)
 	return temp;
 }
 
+std::vector<FileSystem::Node> FileSystem::listDir(const std::string &path)
+{
+	std::vector<Node> list;
+	Folder* mem = this->currentFolder;
+	std::string p = (path == "./"? this->getCurrentPath(): path);
+	if (this->pathExists(path) && this->isFolder(path))
+	{
+		this->goToFolder(path);
+		for (int i = 0; i < this->currentFolder->children.size(); i++)
+			list.push_back(*this->currentFolder->children[i]);
+	}
+	this->currentFolder = mem;
+	return list;
+}
+
 /*Create a new file in the FS*/
 bool FileSystem::createFile(const std::string &filepath, const std::string &data)
 {
@@ -519,17 +509,43 @@ bool FileSystem::isWritable(std::string path)
 bool FileSystem::isFile(const std::string & path)
 {
 	bool is = false;
-	if (this->getFile(path) != nullptr)
-		is = true;
+	if (this->pathExists(path))
+	{
+		if (this->getFile(path) != nullptr)
+			is = true;
+	}
 	return is;
 }
 
 bool FileSystem::isFolder(const std::string & path)
 {
 	bool is = false;
-	if (this->getFile(path) == nullptr)
-		is = true;
+	if (this->pathExists(path))
+	{
+		if (this->getFile(path) == nullptr)
+			is = true;
+	}
 	return is;
+}
+
+int FileSystem::fileSize(const std::string & path)
+{
+	FileSystem::Ret ret = FileSystem::Ret::FAILURE;
+	std::string temp = this->getblockString(path, ret);
+	return temp.size();
+}
+
+std::string FileSystem::absolutePathfromPath(const std::string & path)
+{
+	std::string absPath = "/";
+	if (this->pathExists(path))
+	{
+		Folder* mem = this->currentFolder;
+		this->goToFolder(path);
+		absPath = getCurrentPath();
+		this->currentFolder = mem;
+	}
+	return absPath;
 }
 
 FileSystem::File* FileSystem::getFile(const std::string & path)
@@ -580,55 +596,6 @@ std::string FileSystem::getPath(Folder * folder)
 	}
 	path = "/" + path;
 	return path;
-}
-
-std::string FileSystem::setw(unsigned int val)
-{
-	std::string str = "";
-	for (int i = 0; i < val; i++)
-	{
-		str += " ";
-	}
-	return str;
-}
-
-std::string FileSystem::displayChildren(std::string path)
-{
-	if (path == "./") path = this->getCurrentPath();
-
-	std::string result = "";
-	Folder* mem = this->currentFolder;
-
-	this->goToFolder(path);
-	if (this->currentFolder != this->root)
-		path = this->getCurrentPath();
-	result = "Type      Name      Permissions    Size\n";
-	std::string type = "DIR";
-	Node* node = nullptr;
-	for (int i = 0; i < this->currentFolder->children.size(); i++)
-	{
-		node = this->currentFolder->children[i];
-		int size = 0;
-		type = "DIR";
-		
-		if (dynamic_cast<File*>(node) != nullptr)
-		{
-			FileSystem::Ret ret = FileSystem::Ret::FAILURE;
-			std::string temp = this->getblockString(path + "/" + node->name, ret);
-			size = temp.size();
-			type = "FILE";
-		}
-		std::string rw = "";
-		if (this->isReadable(path + "/" + node->name)) rw += "R";
-		if (this->isWritable(path + "/" + node->name)) rw += "W";
-
-		result += type + this->setw(10 - type.size()) + 
-			this->currentFolder->children[i]->name + this->setw(10 - this->currentFolder->children[i]->name.size()) +
-			rw + this->setw(15 - rw.size()) + std::to_string(size) + "\n";
-	}
-	this->currentFolder = mem;
-
-	return result;
 }
 
 std::string FileSystem::getblockString(std::string path, FileSystem::Ret &ret)

@@ -24,14 +24,9 @@
 class FileSystem
 {
 public:
-	static enum Ret { FAILURE, SUCCESS, NR, NW, NRW };
+	static enum Ret { FAILURE, SUCCESS, NR, NW };
 	static const std::string SAVE_TO_FILE;
-private:
-	MemBlockDevice mMemblockDevice;
-	std::vector<int> emptyBlocks;
-	enum Type { FILE, FOLDER, NONE};
-	// Data structure
-
+	
 	class Node
 	{
 	public:
@@ -40,7 +35,7 @@ private:
 		bool readable;
 		bool writable;
 		Node(std::string name = "?")
-		{ 
+		{
 			this->name = name;
 			this->readable = true;
 			this->writable = true;
@@ -69,6 +64,12 @@ private:
 		File(std::string name, Folder* parent = nullptr) : Node(name) { this->parent = parent; };
 		~File() {};
 	};
+private:
+	MemBlockDevice mMemblockDevice;
+	std::vector<int> emptyBlocks;
+	enum Type { FILE, FOLDER, NONE};
+	// Data structure
+
 	Folder* root;
 	Folder* currentFolder;
 
@@ -81,28 +82,25 @@ private:
 	int findFile(std::string name) const;
 	void parsePath(std::string &temp, std::string &path);
 	Ret freeFile(File *file, bool ignoreRW = false);
-	/* return the position of the last name in the path, need to know if the last name is a file or folder
-	   Ex: if path = "/aa/b/testfile" return 6*/
 	int posOfLastNameInPath(std::string path, Type type);
 	std::string getPath(Folder* folder);
 	File* getFile(const std::string &path);
 	Folder* getFolder(const std::string &path);
-	std::string setw(unsigned int val);
 	void save(std::ofstream &os, Folder* parent = nullptr, Node* node = nullptr);
 	void load(std::ifstream &is, int index, Folder* parent = nullptr, Node* node = nullptr);
 public:
 	FileSystem();
 	~FileSystem();
 
+	/* Own functions */
 	std::string getPathToParent(std::string path, Type type = Type::NONE);
 	std::string getNameFromPath(std::string path, Type type = Type::NONE);
 	bool isReadable(std::string path);
 	bool isWritable(std::string path);
 	bool isFile(const std::string &path);
 	bool isFolder(const std::string &path);
-
-	/* Egna funktioner */
-	Folder* unmountFolder(std::string name); // using currentFolder
+	int fileSize(const std::string &path);
+	std::string absolutePathfromPath(const std::string &path);
 	bool pathExists(std::string path);
 	std::string nameToPath(const std::string &name);
 
@@ -126,10 +124,7 @@ public:
 	std::string goToFolder(std::string path);// return the last name in the path
 
 	/* This function will get all the files and folders in the specified folder */
-	// listDir(...);
-
-	/* Returns a string containing all children of currentFolder */
-	std::string displayChildren(std::string path = "./");
+	std::vector<Node> listDir(const std::string &path);// listDir(...);
 
 	/* Returns the string a file has written to its memory block */
 	std::string getblockString(std::string path, FileSystem::Ret &ret);

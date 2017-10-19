@@ -23,16 +23,19 @@ void errNR(std::string file);
 void errNW(std::string file);
 void format(FileSystem* &fs);
 void ls(FileSystem* &fs, std::string cmdArr[], int nrOfCommands);
-void create(FileSystem* &fs, std::string cmdArr[]);
-void cat(FileSystem* &fs, std::string cmdArr[]);
-void rm(FileSystem* &fs, std::string cmdArr[], std::string &currentDir);
-void cp(FileSystem* &fs, std::string cmdArr[]);
-void append(FileSystem* &fs, std::string cmdArr[]);
-void mv(FileSystem* &fs, std::string cmdArr[]);
-void mkdir(FileSystem* &fs, std::string cmdArr[]);
-void cd(FileSystem* &fs, std::string cmdArr[], std::string &currentDir);
-void pwd(FileSystem* &fs, std::string cmdArr[]);
-void chmod(FileSystem* &fs, std::string cmdArr[]);
+void create(FileSystem* &fs, std::string cmdArr[], int nrOfCommands);
+void cat(FileSystem* &fs, std::string cmdArr[], int nrOfCommands);
+void createImage(FileSystem* &fs, std::string cmdArr[], int nrOfCommands);
+void restoreImage(FileSystem* &fs, std::string cmdArr[], int nrOfCommands);
+void rm(FileSystem* &fs, std::string cmdArr[], std::string &currentDir, int nrOfCommands);
+void cp(FileSystem* &fs, std::string cmdArr[], int nrOfCommands);
+void append(FileSystem* &fs, std::string cmdArr[], int nrOfCommands);
+void mv(FileSystem* &fs, std::string cmdArr[], int nrOfCommands);
+void mkdir(FileSystem* &fs, std::string cmdArr[], int nrOfCommands);
+void cd(FileSystem* &fs, std::string cmdArr[], std::string &currentDir, int nrOfCommands);
+void pwd(FileSystem* &fs, std::string cmdArr[], int nrOfCommands);
+void chmod(FileSystem* &fs, std::string cmdArr[], int nrOfCommands);
+std::string setw(unsigned int val);
 
 int main(void) {
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
@@ -64,40 +67,40 @@ int main(void) {
 				ls(fs, commandArr, nrOfCommands);
                 break;
             case 3: // create
-				create(fs, commandArr);
+				create(fs, commandArr, nrOfCommands);
                 break;
             case 4: // cat
-				cat(fs, commandArr);
+				cat(fs, commandArr, nrOfCommands);
                 break;
             case 5: // createImage
-				fs->createImage();
+				createImage(fs, commandArr, nrOfCommands);
                 break;
             case 6: // restoreImage
-				fs->restoreImage();
+				restoreImage(fs, commandArr, nrOfCommands);
                 break;
             case 7: // rm
-				rm(fs, commandArr, currentDir);
+				rm(fs, commandArr, currentDir, nrOfCommands);
                 break;
             case 8: // cp
-				cp(fs, commandArr);
+				cp(fs, commandArr, nrOfCommands);
                 break;
             case 9: // append
-				append(fs, commandArr);
+				append(fs, commandArr, nrOfCommands);
                 break;
             case 10: // mv
-				mv(fs, commandArr);
+				mv(fs, commandArr, nrOfCommands);
                 break;
             case 11: // mkdir
-				mkdir(fs, commandArr);
+				mkdir(fs, commandArr, nrOfCommands);
                 break;
             case 12: // cd
-				cd(fs, commandArr, currentDir);
+				cd(fs, commandArr, currentDir, nrOfCommands);
                 break;
             case 13: // pwd
-				pwd(fs, commandArr);
+				pwd(fs, commandArr, nrOfCommands);
                 break;
             case 14: // chmod
-                chmod(fs, commandArr);
+                chmod(fs, commandArr, nrOfCommands);
                 break;
             case 15: // help
                 std::cout << help() << std::endl;
@@ -156,7 +159,7 @@ std::string help() {
     helpStr += "* mkdir  <directory>:               Creates a new directory called <directory>\n";
     helpStr += "* cd     <directory>:               Changes current working directory to <directory>\n";
     helpStr += "* pwd:                              Get current working directory\n";
-    helpStr += "* chmod <permission> <file>:        Change access rights for a file\n";
+    helpStr += "* chmod <permission> <file>:        Change access rights for a file to <permission>\n";
     helpStr += "* help:                             Prints this help screen\n";
     return helpStr;
 }
@@ -184,9 +187,9 @@ void errNW(std::string file)
 
 void format(FileSystem* &fs)
 {
-	if (fs != nullptr) delete fs;
-	fs = new FileSystem(); // Tror detta borde fungera b�ttre i denn situation
-	//fs.removeFolder("/");
+	if (fs != nullptr)
+		delete fs;
+	fs = new FileSystem();
 }
 
 void ls(FileSystem* &fs, std::string cmdArr[], int nrOfCommands)
@@ -196,24 +199,77 @@ void ls(FileSystem* &fs, std::string cmdArr[], int nrOfCommands)
 		errFS(cmdArr);
 		return;
 	}
-	std::cout << "Listing directory" << std::endl;
-	std::string temp = "";
-	if (nrOfCommands > 1) temp = cmdArr[1];
-	std::cout << fs->displayChildren(temp) << std::endl;
+	if (nrOfCommands > 2)
+	{
+		errSyntax(cmdArr);
+		return;
+	}
+	std::string path = "./";
+	if (nrOfCommands > 1) path = fs->nameToPath(cmdArr[1]);
+	if ((path == "./"? true : fs->isFolder(path)))
+	{
+		
+		std::vector<FileSystem::Node> list = fs->listDir(path);
+		path = fs->absolutePathfromPath(path);
+		std::string result = "";
+		FileSystem::Node node;
+		int mNameSize = 10;
+		for (int i = 0; i < list.size(); i++)
+		{
+			node = list[i];
+			if (node.name.size() >= mNameSize)
+				mNameSize = node.name.size() + 1;
+		}
+		result += "Type" + setw(10 - 4) + "Name" + setw(mNameSize - 4) +
+			"Permissions" + setw(15 - 11) + "Size" + setw(10 - 4) + "\n";
+		std::string type = "DIR";
+		for (int i = 0; i < list.size(); i++)
+		{
+			node = list[i];
+			int size = 0;
+			type = "DIR";
+
+			if (dynamic_cast<FileSystem::File*>(&node) != nullptr)
+			{
+				size = fs->fileSize((path == "/" ? "" : path) + "/" + node.name);
+				type = "FILE";
+			}
+			std::string rw = "";
+			if (fs->isReadable((path == "/" ? "" : path) + "/" + node.name)) rw += "R";
+			if (fs->isWritable((path == "/" ? "" : path) + "/" + node.name)) rw += "W";
+
+			result += type + setw(10 - type.size()) +
+				node.name + setw(mNameSize - node.name.size()) +
+				rw + setw(15 - rw.size()) + std::to_string(size) + "\n";
+		}
+		
+		std::cout << "Listing directory" << std::endl;
+		std::cout << result << std::endl;
+	}
+	else
+	{
+		errSyntax(cmdArr);
+	}
 }
 
-void create(FileSystem* & fs, std::string cmdArr[])
+void create(FileSystem* & fs, std::string cmdArr[], int nrOfCommands)
 {
 	if (fs == nullptr)
 	{
 		errFS(cmdArr);
 		return;
 	}
+	if (nrOfCommands != 2)
+	{
+		errSyntax(cmdArr);
+		return;
+	}
 	std::cout << "Enter data: ";
 	std::string data = "";
 	getline(std::cin, data);
-	if (data == "maxBlock")
-	{
+
+	if (data == "mb1") // For testing. make so data = block.size + 1, 
+	{						// so the file take up two block for the data
 		data = "";
 		for (int i = 0; i < 512; i++) data += std::to_string(i % 10);
 		data += "#";
@@ -228,26 +284,63 @@ void create(FileSystem* & fs, std::string cmdArr[])
 	}
 }
 
-void cat(FileSystem* & fs, std::string cmdArr[])
+void cat(FileSystem* & fs, std::string cmdArr[], int nrOfCommands)
 {
 	if (fs == nullptr)
 	{
 		errFS(cmdArr);
 		return;
 	}
-	FileSystem::Ret ret = FileSystem::Ret::FAILURE;
-	std::string data = fs->getblockString(fs->nameToPath(cmdArr[1]), ret);
-	if (ret == FileSystem::Ret::SUCCESS)
-		std::cout << data << std::endl;
-	else if (ret == FileSystem::Ret::NR)
-		errNR(fs->getNameFromPath(fs->nameToPath(cmdArr[1])));
+	if (nrOfCommands != 2)
+	{
+		errSyntax(cmdArr);
+		return;
+	}
+	std::string path = fs->nameToPath(cmdArr[1]);
+	if (fs->pathExists(path))
+	{
+		FileSystem::Ret ret = FileSystem::Ret::FAILURE;
+		std::string data = fs->getblockString(path, ret);
+		if (ret == FileSystem::Ret::SUCCESS)
+			std::cout << data << std::endl;
+		else if (ret == FileSystem::Ret::NR)
+			errNR(fs->getNameFromPath(path));
+	}
+	else
+	{
+		errSyntax(cmdArr);
+	}
 }
 
-void rm(FileSystem* & fs, std::string cmdArr[], std::string &currentDir)
+void createImage(FileSystem *& fs, std::string cmdArr[], int nrOfCommands)
+{
+	if (nrOfCommands == 1)
+		fs->createImage();
+	else
+		errSyntax(cmdArr);
+}
+
+void restoreImage(FileSystem *& fs, std::string cmdArr[], int nrOfCommands)
+{
+	if (nrOfCommands == 1)
+	{
+		format(fs);
+		fs->restoreImage();
+	}
+	else
+		errSyntax(cmdArr);
+}
+
+void rm(FileSystem* & fs, std::string cmdArr[], std::string &currentDir, int nrOfCommands)
 {
 	if (fs == nullptr)
 	{
 		errFS(cmdArr);
+		return;
+	}
+	if (nrOfCommands != 2)
+	{
+		errSyntax(cmdArr);
 		return;
 	}
 	FileSystem::Ret ret = FileSystem::Ret::FAILURE;
@@ -275,11 +368,16 @@ void rm(FileSystem* & fs, std::string cmdArr[], std::string &currentDir)
 	}
 }
 
-void cp(FileSystem *& fs, std::string cmdArr[])
+void cp(FileSystem *& fs, std::string cmdArr[], int nrOfCommands)
 {
 	if (fs == nullptr)
 	{
 		errFS(cmdArr);
+		return;
+	}
+	if (nrOfCommands != 3)
+	{
+		errSyntax(cmdArr);
 		return;
 	}
 	FileSystem::Ret ret = FileSystem::Ret::FAILURE;
@@ -290,7 +388,7 @@ void cp(FileSystem *& fs, std::string cmdArr[])
 	{
 		// Check if the new path to the folder of the new file exist
 		std::string pathToParentOfNewPath = fs->getPathToParent(newPath);
-		if (fs->pathExists(pathToParentOfNewPath))
+		if (fs->pathExists(pathToParentOfNewPath) && cmdArr[2] != "")
 		{
 			std::string data = fs->getblockString(oldPath, ret);
 			if (ret == FileSystem::Ret::SUCCESS) // Check if the old path is readable
@@ -311,11 +409,16 @@ void cp(FileSystem *& fs, std::string cmdArr[])
 	}
 }
 
-void append(FileSystem *& fs, std::string cmdArr[])
+void append(FileSystem *& fs, std::string cmdArr[], int nrOfCommands)
 {
 	if (fs == nullptr)
 	{
 		errFS(cmdArr);
+		return;
+	}
+	if (nrOfCommands != 3)
+	{
+		errSyntax(cmdArr);
 		return;
 	}
 	FileSystem::Ret retSource = FileSystem::Ret::FAILURE;
@@ -345,11 +448,16 @@ void append(FileSystem *& fs, std::string cmdArr[])
 		errNR(fs->getNameFromPath(dest));
 }
 
-void mv(FileSystem* & fs, std::string cmdArr[])
+void mv(FileSystem* & fs, std::string cmdArr[], int nrOfCommands)
 {
 	if (fs == nullptr)
 	{
 		errFS(cmdArr);
+		return;
+	}
+	if (nrOfCommands != 3)
+	{
+		errSyntax(cmdArr);
 		return;
 	}
 	FileSystem::Ret retOld = FileSystem::Ret::FAILURE;
@@ -360,7 +468,7 @@ void mv(FileSystem* & fs, std::string cmdArr[])
 	{
 		// Check if the new path to the folder of the new file exist
 		std::string pathToParentOfNewPath = fs->getPathToParent(newPath);
-		if (fs->pathExists(pathToParentOfNewPath))
+		if (fs->pathExists(pathToParentOfNewPath) && cmdArr[2] != "")
 		{
 			std::string data = fs->getblockString(oldPath, retOld);
 			if (retOld == FileSystem::Ret::SUCCESS)
@@ -375,13 +483,20 @@ void mv(FileSystem* & fs, std::string cmdArr[])
 		errNR(fs->getNameFromPath(oldPath));
 	if (retOld == FileSystem::Ret::NW)
 		errNW(fs->getNameFromPath(oldPath));
+	if (!result)
+		errSyntax(cmdArr);
 }
 
-void mkdir(FileSystem* & fs, std::string cmdArr[])
+void mkdir(FileSystem* & fs, std::string cmdArr[], int nrOfCommands)
 {
 	if (fs == nullptr)
 	{
 		errFS(cmdArr);
+		return;
+	}
+	if (nrOfCommands != 2 || cmdArr[1] == "")
+	{
+		errSyntax(cmdArr);
 		return;
 	}
 	if (!fs->createFolder(fs->nameToPath(cmdArr[1])))
@@ -390,11 +505,16 @@ void mkdir(FileSystem* & fs, std::string cmdArr[])
 	}
 }
 
-void cd(FileSystem* & fs, std::string cmdArr[], std::string &currentDir)
+void cd(FileSystem* & fs, std::string cmdArr[], std::string &currentDir, int nrOfCommands)
 {
 	if (fs == nullptr)
 	{
 		errFS(cmdArr);
+		return;
+	}
+	if (nrOfCommands != 2 || cmdArr[1] == "")
+	{
+		errSyntax(cmdArr);
 		return;
 	}
 	// Change directory
@@ -408,25 +528,53 @@ void cd(FileSystem* & fs, std::string cmdArr[], std::string &currentDir)
 	}
 }
 
-void pwd(FileSystem* & fs, std::string cmdArr[])
+void pwd(FileSystem* & fs, std::string cmdArr[], int nrOfCommands)
 {
 	if (fs == nullptr)
 	{
 		errFS(cmdArr);
+		return;
+	}
+	if (nrOfCommands != 1)
+	{
+		errSyntax(cmdArr);
 		return;
 	}
 	std::cout << fs->getCurrentPath() << std::endl;
 }
 
-void chmod(FileSystem* & fs, std::string cmdArr[])
+void chmod(FileSystem* & fs, std::string cmdArr[], int nrOfCommands)
 {
 	if (fs == nullptr)
 	{
 		errFS(cmdArr);
 		return;
 	}
-	if (!fs->chmod(atoi(cmdArr[1].c_str()), fs->nameToPath(cmdArr[2])))
+	if (nrOfCommands != 3 || cmdArr[1] == "" || cmdArr[2] == "")
+	{
+		errSyntax(cmdArr);
+		return;
+	}
+	int result;
+	if (std::stringstream(cmdArr[1]) >> result)
+	{
+		if (!fs->chmod(result, fs->nameToPath(cmdArr[2])))
+		{
+			errSyntax(cmdArr);
+		}
+	}
+	else
 	{
 		errSyntax(cmdArr);
 	}
+}
+
+std::string setw(unsigned int val)
+{
+	std::string str = "";
+	for (int i = 0; i < val; i++)
+	{
+		str += " ";
+	}
+	return str;
 }

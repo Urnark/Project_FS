@@ -550,7 +550,7 @@ bool FileSystem::isFolder(const std::string & path)
 int FileSystem::fileSize(const std::string & path)
 {
 	FileSystem::Ret ret = FileSystem::Ret::FAILURE;
-	std::string temp = this->getblockString(path, ret);
+	std::string temp = this->getblockString(path, ret, true);
 	return temp.size();
 }
 
@@ -617,7 +617,7 @@ std::string FileSystem::getPath(Folder * folder)
 	return path;
 }
 
-std::string FileSystem::getblockString(std::string path, FileSystem::Ret &ret)
+std::string FileSystem::getblockString(std::string path, FileSystem::Ret &ret, bool ignoreRet)
 {
 	std::string result = "";
 	Folder* mem = this->currentFolder;
@@ -630,7 +630,7 @@ std::string FileSystem::getblockString(std::string path, FileSystem::Ret &ret)
 		File* file = dynamic_cast<File*>(this->currentFolder->children[location]);
 
 		ret = FileSystem::Ret::NR;
-		if (file->readable)
+		if (file->readable || ignoreRet)
 		{
 			for (int i = 0; i < file->blocks.size(); i++)
 			{
@@ -669,32 +669,32 @@ std::string FileSystem::getCurrentPath()
 	this->currentFolder = mem;
 	return result;
 }
-
 bool FileSystem::chmod(int val, std::string path)
 {
-    Folder* mem = this->currentFolder;
-	File* theFile = this->getFile(path);
+	Folder* mem = this->currentFolder;
+	bool r = true;
+	bool w = true;
 	bool result = false;
-	if (theFile != nullptr)
+	if (this->getFile(path) != nullptr)
 	{
 		if (val == 1) { // 11
-			theFile->readable = true;
-			theFile->writable = true;
+			r = true;
+			w = true;
 			result = true;
 		}
 		else if (val == 2) { // 10
-			theFile->readable = true;
-			theFile->writable = false;
+			r = true;
+			w = false;
 			result = true;
 		}
 		else if (val == 3) { // 01
-			theFile->readable = false;
-			theFile->writable = true;
+			r = false;
+			w = true;
 			result = true;
 		}
 		else if (val == 4) { // 00
-			theFile->readable = false;
-			theFile->writable = false;
+			r = false;
+			w = false;
 			result = true;
 		}
 		else
@@ -702,6 +702,24 @@ bool FileSystem::chmod(int val, std::string path)
 			this->currentFolder = mem;
 			return false;
 		}
+	}
+	if (val >= 1 && val <= 4)
+		result = this->chmod(path, r, w);
+	this->currentFolder = mem;
+	return result;
+	
+}
+
+bool FileSystem::chmod(std::string path, bool toR, bool toW)
+{
+    Folder* mem = this->currentFolder;
+	File* theFile = this->getFile(path);
+	bool result = false;
+	if (theFile != nullptr)
+	{
+		theFile->readable = toR;
+		theFile->writable = toW;
+		result = true;
 	}
     this->currentFolder = mem;
 	return result;

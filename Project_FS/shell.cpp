@@ -426,13 +426,24 @@ void append(FileSystem *& fs, std::string cmdArr[], int nrOfCommands)
 	if (fs->pathExists(source) && fs->pathExists(dest))// Check if the paths exists
 	{
 		std::string dataSource = fs->getblockString(source, retSource);
-		std::string dataDest = fs->getblockString(dest, retDest);
+		std::string dataDest = fs->getblockString(dest, retDest, true);
+		std::cout << "Source: " << dataSource << ", dest: " << dataDest << std::endl;
 		//Check reading and writing privileges
-		if (retSource == FileSystem::Ret::SUCCESS && retDest == FileSystem::Ret::SUCCESS)
+		if (retSource == FileSystem::Ret::SUCCESS)
 		{
-			fs->removeFile(dest);
-			std::string newData = dataDest + dataSource;
-			fs->createFile(dest, newData);
+			if (fs->isWritable(dest))
+			{
+				bool r = fs->isReadable(dest);
+				fs->removeFile(dest);
+				std::string newData = dataDest + dataSource;
+				fs->createFile(dest, newData);
+				fs->chmod(dest, r, true);
+
+			}
+			else
+			{
+				errNW(fs->getNameFromPath(dest));
+			}
 		}
 	}
 	else
@@ -442,8 +453,6 @@ void append(FileSystem *& fs, std::string cmdArr[], int nrOfCommands)
 
 	if (retSource == FileSystem::Ret::NR)
 		errNR(fs->getNameFromPath(source));
-	if (retDest == FileSystem::Ret::NR)
-		errNR(fs->getNameFromPath(dest));
 }
 
 void mv(FileSystem* & fs, std::string cmdArr[], int nrOfCommands)

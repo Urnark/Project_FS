@@ -115,13 +115,14 @@ public:
 	std::vector<Node> listDir(const std::string &path);// listDir(...);
 
 	/* Returns the string a file has written to its memory block */
-	std::string getblockString(std::string path, FileSystem::Ret &ret);
+	std::string getblockString(std::string path, FileSystem::Ret &ret, bool ignoreRet = false);
 
 	/* Returns a string representing the filepath to currentFolder*/
 	std::string getCurrentPath();
 
 	/* Changes read/write rights for a file*/
 	bool chmod(int val, std::string path);
+	bool chmod(std::string path, bool toR, bool toW);
 
 	void createImage();
 	void restoreImage();

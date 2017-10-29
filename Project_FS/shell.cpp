@@ -427,7 +427,6 @@ void append(FileSystem *& fs, std::string cmdArr[], int nrOfCommands)
 	{
 		std::string dataSource = fs->getblockString(source, retSource);
 		std::string dataDest = fs->getblockString(dest, retDest, true);
-		std::cout << "Source: " << dataSource << ", dest: " << dataDest << std::endl;
 		//Check reading and writing privileges
 		if (retSource == FileSystem::Ret::SUCCESS)
 		{
